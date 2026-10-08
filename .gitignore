@@ -2,3 +2,6 @@
 .vscode/
 __pycache__/
 data/
+.env
+chroma_db/
+tmp/

@@ -1,87 +1,93 @@
-import aiofiles
-from pathlib import Path
 import asyncio
-from fastapi import APIRouter, HTTPException, UploadFile, status, BackgroundTasks
-import pymupdf4llm
+from pathlib import Path
+from typing import Annotated
+
+import aiofiles
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from langchain_chroma import Chroma
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from app.dependencies import get_text_splitter, get_vector_store
+from src.ingestion import chunk_index_document, pdf_to_md, validate_pdf
 
 ingest_router = APIRouter()
 
 UPLOAD_DIR = Path("data/docs/")
 
 ingestion_queue = asyncio.Queue()
-ingestion_status = {} 
+ingestion_status = {}
 
-def pdf_to_md(pdf_path: Path, output_path: Path):
-    try:
-        md_text = pymupdf4llm.to_markdown(str(pdf_path))
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(md_text)
-    except Exception as e:
-        print(f"Error processing file: {e}")
 
-def db_ingestion(file_path: Path, md_path:Path):
+def db_ingestion(
+    file_path: Path,
+    md_path: Path,
+    text_splitter: RecursiveCharacterTextSplitter,
+    vector_store: Chroma,
+):
     pdf_to_md(file_path, md_path)
+    chunk_index_document(text_splitter, vector_store, md_path)
+
 
 async def queue_worker():
     while True:
-
-        file_path, md_path, filename = await ingestion_queue.get()
+        (
+            file_path,
+            md_path,
+            filename,
+            text_splitter,
+            vector_store,
+        ) = await ingestion_queue.get()
         try:
             ingestion_status[filename] = "processing"
-            await asyncio.to_thread(db_ingestion, file_path, md_path)
-            
+            await asyncio.to_thread(
+                db_ingestion, file_path, md_path, text_splitter, vector_store
+            )
+
             ingestion_status[filename] = "completed"
-        except Exception:
+        except Exception:  # noqa: BLE001
             ingestion_status[filename] = "failed"
+            file_path.unlink(missing_ok=True)
+            md_path.unlink(missing_ok=True)
+            print(f"Deleted files for: {filename}")
         finally:
             ingestion_queue.task_done()
 
 
-async def validate_pdf(file: UploadFile) -> bool:
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not permitted extension. File '{file.filename}' must be .pdf",
-        )
-
-    if file.content_type != "application/pdf":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Mime type is not application/pdf",
-        )
-    try:
-        first_bytes = await file.read(5)
-        await file.seek(0)
-        if first_bytes != b"%PDF-":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Content validation failed.",
-            )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Intern error processing the file: {e!s}",
-        )
-    return True
-
-
 @ingest_router.post("/ingest")
-async def upload_ingest(files: list[UploadFile]):
+async def upload_ingest(
+    files: list[UploadFile],
+    text_splitter: Annotated[
+        RecursiveCharacterTextSplitter, Depends(get_text_splitter)
+    ],
+    vector_store: Annotated[Chroma, Depends(get_vector_store)],
+):
 
     for file in files:
         if await validate_pdf(file):
             file_path = UPLOAD_DIR / Path("pdf") / file.filename
-            file_path.parent.mkdir(exist_ok=True, parents=True)
+            if not file_path.is_file():
+                file_path.parent.mkdir(exist_ok=True, parents=True)
 
-            async with aiofiles.open(file_path, "wb") as buffer:
-                while chunk := await file.read(64 * 1024):  
-                    await buffer.write(chunk)
+                async with aiofiles.open(file_path, "wb") as buffer:
+                    while chunk := await file.read(64 * 1024):
+                        await buffer.write(chunk)
 
-            md_path = UPLOAD_DIR / Path("md") /  Path(file.filename.rsplit('.', 1)[0] + ".md")
-            md_path.parent.mkdir(exist_ok=True, parents=True)
+                md_path = (
+                    UPLOAD_DIR
+                    / Path("md")
+                    / Path(file.filename.rsplit(".", 1)[0] + ".md")
+                )
+                md_path.parent.mkdir(exist_ok=True, parents=True)
 
-            ingestion_status[file.filename] = "pending"
-            await ingestion_queue.put((file_path, md_path, file.filename))
+                ingestion_status[file.filename] = "pending"
+                await ingestion_queue.put(
+                    (file_path, md_path, file.filename, text_splitter, vector_store)
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"{file.filename} already uploaded and indexed",
+                )
 
         else:
             raise HTTPException(
