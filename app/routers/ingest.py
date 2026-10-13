@@ -8,6 +8,7 @@ from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.dependencies import get_text_splitter, get_vector_store
+from src.graph import rollback_neo4j
 from src.ingestion import chunk_index_document, pdf_to_md, validate_pdf
 
 ingest_router = APIRouter()
@@ -16,16 +17,6 @@ UPLOAD_DIR = Path("data/docs/")
 
 ingestion_queue = asyncio.Queue()
 ingestion_status = {}
-
-
-def db_ingestion(
-    file_path: Path,
-    md_path: Path,
-    text_splitter: RecursiveCharacterTextSplitter,
-    vector_store: Chroma,
-):
-    pdf_to_md(file_path, md_path)
-    chunk_index_document(text_splitter, vector_store, md_path)
 
 
 async def queue_worker():
@@ -37,14 +28,29 @@ async def queue_worker():
             text_splitter,
             vector_store,
         ) = await ingestion_queue.get()
+
+        added_ids = []
         try:
             ingestion_status[filename] = "processing"
-            await asyncio.to_thread(
-                db_ingestion, file_path, md_path, text_splitter, vector_store
-            )
+
+            converted = await asyncio.to_thread(pdf_to_md, file_path, md_path)
+            if converted:
+                added_ids = await asyncio.to_thread(
+                    chunk_index_document, text_splitter, vector_store, md_path
+                )
 
             ingestion_status[filename] = "completed"
         except Exception:  # noqa: BLE001
+            if added_ids:
+                try:
+                    await asyncio.to_thread(vector_store.delete, ids=added_ids)
+                    print(f"Rollback: {len(added_ids)} chunks deleted from Chroma.")
+                except Exception as del_err:  # noqa: BLE001
+                    print(f"Error trying to clean Chroma: {del_err}")
+
+            if added_ids:
+                await asyncio.to_thread(rollback_neo4j, str(file_path))
+
             ingestion_status[filename] = "failed"
             file_path.unlink(missing_ok=True)
             md_path.unlink(missing_ok=True)

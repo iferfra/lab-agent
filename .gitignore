@@ -5,3 +5,4 @@ data/
 .env
 chroma_db/
 tmp/
+.python-version

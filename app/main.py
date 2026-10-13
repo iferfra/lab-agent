@@ -6,8 +6,8 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from langchain_aws import BedrockEmbeddings
 from langchain_chroma import Chroma
-from langchain_ollama import OllamaEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.routers.ingest import ingest_router, queue_worker
@@ -25,7 +25,9 @@ async def lifespan(app: FastAPI):
         chunk_size=int(os.getenv("CHUNK_SIZE")),
         chunk_overlap=int(os.getenv("CHUNK_OVERLAP")),
     )
-    chunk_embedder = OllamaEmbeddings(model="nomic-embed-text")
+    chunk_embedder = BedrockEmbeddings(
+        region_name="us-east-1", model_id="amazon.titan-embed-text-v2:0", normalize=True
+    )
     vector_store = Chroma(
         embedding_function=chunk_embedder, persist_directory="./chroma_db"
     )
