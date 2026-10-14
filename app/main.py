@@ -29,7 +29,10 @@ async def lifespan(app: FastAPI):
         region_name="us-east-1", model_id="amazon.titan-embed-text-v2:0", normalize=True
     )
     vector_store = Chroma(
-        embedding_function=chunk_embedder, persist_directory="./chroma_db"
+        collection_name="lab-rag",
+        embedding_function=chunk_embedder,
+        host="localhost",
+        port=6000,
     )
     yield {
         "ingestion_text_splitter": ingestion_text_splitter,

@@ -6,3 +6,4 @@ data/
 chroma_db/
 tmp/
 .python-version
+chroma-data/

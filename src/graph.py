@@ -1,3 +1,4 @@
+import hashlib
 import os
 
 from dotenv import load_dotenv
@@ -45,14 +46,14 @@ NODE_PROPERTIES = [
 ADDITIONAL_INSTRUCTIONS = """
 Extract only explicitly stated entities (no assumptions/hallucinations).
 1. Title Case names. Use hyphens for technical terms ('RAF-DB').
-2. Person: Full names. BAN 'et al.' or group suffixes.
-3. Organization: Fully expanded ('Google').
+2. Person: Full real names. BAN ('et al.', 'Li et al.', 'Suárez et al.') or group suffixes.
+3. Organization: Fully expanded ('Google', 'Universidad Politécnica de Madrid').
 4. AI Model: ML/CV methods ('Transformers', 'YOLO'). Properties: 'parameters', 'framework'.
-5. Dataset: Specific benchmarks only ('ImageNet'). BAN generics. Property: 'modality'.
+5. Dataset: Specific benchmarks only ('ImageNet'). BAN generics like 'test dataset'. Property: 'modality'.
 6. Metric: Performance measures ('mAP', 'Accuracy'). Property: 'value'.
 7. Hardware: Compute units ('NVIDIA A100', 'RTX 3090').
 8. Loss Function: Optimization objectives ('Cross-Entropy').
-9. Paper Reference properties required: authors, title, venue. Do not create entities for number references, example: [23].
+9. Paper Reference properties required: authors, title, venue. Do not create entities for number references, example: [23]. Only if all properties available.
 """
 
 
@@ -79,9 +80,24 @@ def build_upload_graph(chunks):
     )
 
     graph_documents = []
+    skipped_count = 0
 
     for i, chunk in enumerate(chunks, 1):
         try:
+            unique_string = chunk.page_content
+            chunk_id = hashlib.md5(unique_string.encode("utf-8")).hexdigest()
+
+            chunk.metadata["id"] = chunk_id
+
+            check_query = (
+                "MATCH (d:Document {id: $chunk_id}) RETURN count(d) > 0 AS exists"
+            )
+            res = graph.query(check_query, params={"chunk_id": chunk_id})
+
+            if res and res[0]["exists"]:
+                skipped_count += 1
+                continue
+
             g_doc = llm_transformer.convert_to_graph_documents([chunk])
             if not g_doc:
                 continue
@@ -97,7 +113,7 @@ def build_upload_graph(chunks):
             MATCH (n)
             WHERE any(label IN labels(n) WHERE label = ent.type)
             WITH ent, n, apoc.text.levenshteinSimilarity(n.id, ent.name) AS similarity
-            WHERE similarity > 0.85
+            WHERE similarity > 0.80
             RETURN ent.name AS original, n.id AS match
             ORDER BY similarity DESC
             """
@@ -131,7 +147,9 @@ def build_upload_graph(chunks):
         raise Exception  # noqa: TRY002
 
 
-def rollback_neo4j(file_path: str):
+def rollback_neo4j(added_ids: list[str]):
+    if not added_ids:
+        return
     try:
         uri = os.getenv("NEO4J_URI")
         username = os.getenv("NEO4J_USERNAME")
@@ -143,15 +161,15 @@ def rollback_neo4j(file_path: str):
         )
 
         query = """
-        MATCH (d:Document)
-        WHERE d.source = $source_path OR d.id = $source_path
+        UNWIND $chunk_ids AS cid
+        MATCH (d:Document {id: cid})
         OPTIONAL MATCH (d)-[:MENTIONS]->(e)
         DETACH DELETE d
         WITH e
         WHERE e IS NOT NULL AND size((e)--()) = 0
         DELETE e
         """
-        graph.query(query, params={"source_path": str(file_path)})
-        print(f"Rollback Neo4j: Graph cleaned for {file_path}")
+        graph.query(query, params={"chunk_ids": added_ids})
+        print(f"Rollback Neo4j: Graph cleaned for {len(added_ids)} chunks.")
     except Exception as e:  # noqa: BLE001
         print(f"Error while doing rollback in Neo4j: {e}")

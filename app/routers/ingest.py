@@ -9,7 +9,13 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.dependencies import get_text_splitter, get_vector_store
 from src.graph import rollback_neo4j
-from src.ingestion import chunk_index_document, pdf_to_md, validate_pdf
+from src.ingestion import (
+    DocumentAlreadyIndexedError,
+    IndexingProcessError,
+    chunk_index_document,
+    pdf_to_md,
+    validate_pdf,
+)
 
 ingest_router = APIRouter()
 
@@ -40,7 +46,14 @@ async def queue_worker():
                 )
 
             ingestion_status[filename] = "completed"
-        except Exception:  # noqa: BLE001
+
+        except DocumentAlreadyIndexedError:
+            ingestion_status[filename] = "completed"
+            print(f"Skipped ingestion for {filename} (already up to date).")
+
+        except IndexingProcessError as err:
+            added_ids = err.added_ids
+
             if added_ids:
                 try:
                     await asyncio.to_thread(vector_store.delete, ids=added_ids)
@@ -49,13 +62,18 @@ async def queue_worker():
                     print(f"Error trying to clean Chroma: {del_err}")
 
             if added_ids:
-                await asyncio.to_thread(rollback_neo4j, str(file_path))
+                await asyncio.to_thread(rollback_neo4j, added_ids)
 
             ingestion_status[filename] = "failed"
+
+        except Exception as general_err:  # noqa: BLE001
+            print(f"Unexpected error for {filename}: {general_err}")
+            ingestion_status[filename] = "failed"
+
+        finally:
             file_path.unlink(missing_ok=True)
             md_path.unlink(missing_ok=True)
-            print(f"Deleted files for: {filename}")
-        finally:
+            print(f"Cleaned temp files for: {filename}")
             ingestion_queue.task_done()
 
 
