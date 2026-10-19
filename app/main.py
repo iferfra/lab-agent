@@ -6,40 +6,35 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from langchain_aws import BedrockEmbeddings
-from langchain_chroma import Chroma
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_neo4j import Neo4jGraph
 
-from app.routers.ingest import ingest_router, queue_worker
+import src.agent.tools as tool_module
+from app.routers.chat import chat_router
+from app.routers.ingest import ingest_router
+from src.graph import init_neo4j_schema
+from src.ingestion import ingestion_queue_worker
 
 load_dotenv()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Logic before app startup
-    worker_task = asyncio.create_task(queue_worker())  # Ingestion queue worker
-    await asyncio.sleep(0)  # To let the event loop start the worker
 
-    ingestion_text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=int(os.getenv("CHUNK_SIZE")),
-        chunk_overlap=int(os.getenv("CHUNK_OVERLAP")),
+    app.state.neo4j_graph = Neo4jGraph(
+        url=os.getenv("NEO4J_URI"),
+        username=os.getenv("NEO4J_USERNAME"),
+        password=os.getenv("NEO4J_PASSWORD"),
+        database=os.getenv("NEO4J_DATABASE"),
     )
-    chunk_embedder = BedrockEmbeddings(
-        region_name="us-east-1", model_id="amazon.titan-embed-text-v2:0", normalize=True
-    )
-    vector_store = Chroma(
-        collection_name="lab-rag",
-        embedding_function=chunk_embedder,
-        host="localhost",
-        port=6000,
-    )
-    yield {
-        "ingestion_text_splitter": ingestion_text_splitter,
-        "embedder": chunk_embedder,
-        "vector_store": vector_store,
-    }
-    # Logic before app stop
+
+    init_neo4j_schema(app.state.neo4j_graph, embedding_dimension=1024)
+    tool_module.graph = app.state.neo4j_graph
+
+    worker_task = asyncio.create_task(ingestion_queue_worker(app))
+    await asyncio.sleep(0)
+
+    yield
+
     worker_task.cancel()
     try:
         await worker_task
@@ -62,6 +57,7 @@ app.add_middleware(
 )
 
 app.include_router(ingest_router)
+app.include_router(chat_router)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,85 +1,110 @@
 import hashlib
-import os
 
 from dotenv import load_dotenv
-from langchain_aws import ChatBedrockConverse
+from langchain_aws import BedrockEmbeddings, ChatBedrockConverse
+from langchain_core.documents import Document
 from langchain_experimental.graph_transformers import LLMGraphTransformer
 from langchain_neo4j import Neo4jGraph
 
 load_dotenv()
 
+
 ALLOWED_NODES = [
-    "Person",
-    "Organization",
-    "AI Model",
+    "Concept",
+    "Method",
     "Dataset",
-    "Paper Reference",
     "Metric",
-    "Hardware",
-    "Loss Function",
+    "Benchmark",
+    "Task",
 ]
 
 ALLOWED_RELATIONSHIPS = [
-    "USED_IN",
-    "AUTHORED",
-    "RESEARCHES",
-    "AFFILIATED_WITH",
-    "APPEARS_IN",
-    "ACHIEVES",  # (AI Model) -[:ACHIEVES {value: "85.4%"}]-> (Metric)
-    "TRAINED_ON",  # (AI Model) -[:TRAINED_ON]-> (Dataset)
-    "USES_LOSS",  # (AI Model) -[:USES_LOSS]-> (Loss Function)
-    "BENCHMARKED_ON",  # (AI Model) -[:BENCHMARKED_ON]-> (Hardware)
+    "USES",
+    "SOLVES",
+    "TRAINED_ON",
+    "EVALUATED_ON",
+    "OUTPERFORMS",
+    "HAS_METRIC",
 ]
 
-NODE_PROPERTIES = [
-    "name",
-    "source",
-    "authors",
-    "venue",
-    "title",
-    "parameters",
-    "framework",
-    "modality",
-    "value",
-]
 
 ADDITIONAL_INSTRUCTIONS = """
-Extract only explicitly stated entities (no assumptions/hallucinations).
-1. Title Case names. Use hyphens for technical terms ('RAF-DB').
-2. Person: Full real names. BAN ('et al.', 'Li et al.', 'Suárez et al.') or group suffixes.
-3. Organization: Fully expanded ('Google', 'Universidad Politécnica de Madrid').
-4. AI Model: ML/CV methods ('Transformers', 'YOLO'). Properties: 'parameters', 'framework'.
-5. Dataset: Specific benchmarks only ('ImageNet'). BAN generics like 'test dataset'. Property: 'modality'.
-6. Metric: Performance measures ('mAP', 'Accuracy'). Property: 'value'.
-7. Hardware: Compute units ('NVIDIA A100', 'RTX 3090').
-8. Loss Function: Optimization objectives ('Cross-Entropy').
-9. Paper Reference properties required: authors, title, venue. Do not create entities for number references, example: [23]. Only if all properties available.
+Extract scientific knowledge graph entities and relationships from the text chunk.
+
+ALLOWED NODES:
+- Concept: Theories, principles, mechanisms.
+- Method: Algorithms, models, architectures.
+- Dataset: Data collections. Must be specific datasets. Ex: 'Coco', 'Multi-PIE', 'RAF-DB'.
+- Metric: Measurement units. Ex: 'Accuracy', 'Recall', 'Fairness GAP'.
+- Benchmark: Evaluation suites.
+- Task: Problems addressed.
+
+ALLOWED RELATIONSHIPS: USES, SOLVES, TRAINED_ON, EVALUATED_ON, OUTPERFORMS, HAS_METRIC.
+
+RULES:
+1. Strict schema compliance only.
+2. NO authors, paper titles, institutions, URLs, or generic text ("paper", "table", "dataset").
+3. Use canonical, concise names. If no technical entities are found, return empty.
 """
 
+embedder = BedrockEmbeddings(
+    region_name="us-east-1", model_id="amazon.titan-embed-text-v2:0", normalize=True
+)
 
-def build_upload_graph(chunks):
-    uri = os.getenv("NEO4J_URI")
-    username = os.getenv("NEO4J_USERNAME")
-    password = os.getenv("NEO4J_PASSWORD")
-    neo_db = os.getenv("NEO4J_DATABASE")
+graph_llm = ChatBedrockConverse(
+    model_id="us.meta.llama3-3-70b-instruct-v1:0",
+    region_name="us-east-1",
+    temperature=0.0,
+)
 
-    graph = Neo4jGraph(url=uri, username=username, password=password, database=neo_db)
+graph_transformer = LLMGraphTransformer(
+    llm=graph_llm,
+    strict_mode=True,
+    allowed_nodes=ALLOWED_NODES,
+    allowed_relationships=ALLOWED_RELATIONSHIPS,
+    additional_instructions=ADDITIONAL_INSTRUCTIONS,
+    node_properties=True,
+)
 
-    llm = ChatBedrockConverse(
-        model_id="us.amazon.nova-2-lite-v1:0",
-        region_name="us-east-1",
-        temperature=0.0,
+
+def build_upload_graph(graph: Neo4jGraph, chunks: list[Document], file_metadata: dict):
+
+    paper_id = hashlib.md5(
+        file_metadata.get("file_name", "unknown").encode("utf-8")
+    ).hexdigest()
+    create_paper_query = """
+    MERGE (p:Paper {id: $paper_id})
+    SET p.title = $title,
+        p.doi = $doi,
+        p.venue = $venue,
+        p.year = $year,
+        p.file_name = $file_name,
+        p.repository_link = $repository_link
+    """
+    graph.query(
+        create_paper_query,
+        params={
+            "paper_id": paper_id,
+            "title": file_metadata.get("paper_title"),
+            "doi": file_metadata.get("doi"),
+            "venue": file_metadata.get("venue"),
+            "year": file_metadata.get("year"),
+            "file_name": file_metadata.get("file_name"),
+            "repository_link": file_metadata.get("repository_link"),
+        },
     )
-
-    llm_transformer = LLMGraphTransformer(
-        llm=llm,
-        allowed_nodes=ALLOWED_NODES,
-        allowed_relationships=ALLOWED_RELATIONSHIPS,
-        additional_instructions=ADDITIONAL_INSTRUCTIONS,
-        node_properties=NODE_PROPERTIES,
-    )
+    authors = file_metadata.get("authors")
+    if authors:
+        authors_query = """
+        MATCH (p:Paper {id: $paper_id})
+        UNWIND $authors AS author_name
+        MERGE (a:Author {name: author_name})
+        MERGE (a)-[:WROTE]->(p)
+        """
+        graph.query(authors_query, params={"paper_id": paper_id, "authors": authors})
 
     graph_documents = []
+    chunk_embeddings_list = []
     skipped_count = 0
 
     for i, chunk in enumerate(chunks, 1):
@@ -98,11 +123,14 @@ def build_upload_graph(chunks):
                 skipped_count += 1
                 continue
 
-            g_doc = llm_transformer.convert_to_graph_documents([chunk])
-            if not g_doc:
-                continue
+            doc = Document(page_content=chunk.page_content, metadata={"id": chunk_id})
 
-            entities = g_doc[0].nodes
+            doc_embedding = embedder.embed_documents([chunk.page_content])[0]
+            chunk_embeddings_list.append({"id": chunk_id, "embedding": doc_embedding})
+
+            g_doc = graph_transformer.convert_to_graph_documents([doc])[0]
+
+            entities = g_doc.nodes
             if not entities:
                 continue
 
@@ -113,7 +141,7 @@ def build_upload_graph(chunks):
             MATCH (n)
             WHERE any(label IN labels(n) WHERE label = ent.type)
             WITH ent, n, apoc.text.levenshteinSimilarity(n.id, ent.name) AS similarity
-            WHERE similarity > 0.80
+            WHERE similarity > 0.85
             RETURN ent.name AS original, n.id AS match
             ORDER BY similarity DESC
             """
@@ -126,50 +154,67 @@ def build_upload_graph(chunks):
                 if entity.id in name_mapping:
                     entity.id = name_mapping[entity.id]
 
-            for rel in g_doc[0].relationships:
+            for rel in g_doc.relationships:
                 if rel.source.id in name_mapping:
                     rel.source.id = name_mapping[rel.source.id]
                 if rel.target.id in name_mapping:
                     rel.target.id = name_mapping[rel.target.id]
 
-            graph_documents.extend(g_doc)
+            graph_documents.append(g_doc)
 
         except Exception as e:  # noqa: BLE001
             print(f"\nError in chunk {i}: {e}. Skipping chunk...")
-            # raise
 
     if graph_documents:
         print(f"Uploading {len(graph_documents)} graph blocks to Neo4j...")
+
         graph.add_graph_documents(graph_documents, include_source=True)
-        print("Upload complete.")
+
+        print("Attaching vector embeddings and linking chunks to the Paper...")
+
+        link_chunks_query = """
+        UNWIND $updates AS row
+        MATCH (d:Document {id: row.id})
+        MATCH (p:Paper {id: $paper_id})
+        SET d.embedding = row.embedding
+        MERGE (d)-[:PART_OF]->(p)
+        """
+
+        graph.query(
+            link_chunks_query,
+            params={"updates": chunk_embeddings_list, "paper_id": paper_id},
+        )
+        print("Graph ingestion and metadata linking complete.")
     else:
         print("\nNo entities or relations could be extracted.")
         raise Exception  # noqa: TRY002
 
 
-def rollback_neo4j(added_ids: list[str]):
-    if not added_ids:
-        return
-    try:
-        uri = os.getenv("NEO4J_URI")
-        username = os.getenv("NEO4J_USERNAME")
-        password = os.getenv("NEO4J_PASSWORD")
-        neo_db = os.getenv("NEO4J_DATABASE")
-
-        graph = Neo4jGraph(
-            url=uri, username=username, password=password, database=neo_db
-        )
-
-        query = """
-        UNWIND $chunk_ids AS cid
-        MATCH (d:Document {id: cid})
-        OPTIONAL MATCH (d)-[:MENTIONS]->(e)
-        DETACH DELETE d
-        WITH e
-        WHERE e IS NOT NULL AND size((e)--()) = 0
-        DELETE e
+def init_neo4j_schema(graph, embedding_dimension: int = 1024):
+    """
+    Inicializa automáticamente restricciones e índices vectoriales en Neo4j
+    al arrancar la aplicación. Es seguro ejecutarlo múltiples veces.
+    """
+    setup_queries = [
         """
-        graph.query(query, params={"chunk_ids": added_ids})
-        print(f"Rollback Neo4j: Graph cleaned for {len(added_ids)} chunks.")
-    except Exception as e:  # noqa: BLE001
-        print(f"Error while doing rollback in Neo4j: {e}")
+        CREATE CONSTRAINT unique_node_id IF NOT EXISTS 
+        FOR (n:Entity) REQUIRE n.id IS UNIQUE
+        """,
+        f"""
+        CREATE VECTOR INDEX documentVectorIndex IF NOT EXISTS
+        FOR (d:Document) 
+        ON (d.embedding)
+        OPTIONS {{ indexConfig: {{
+          `vector.dimensions`: {embedding_dimension},
+          `vector.similarity_function`: 'cosine'
+        }}}}
+        """,
+    ]
+
+    print("Checking and initializing Neo4j schema...")
+    for query in setup_queries:
+        try:
+            graph.query(query.strip())
+        except Exception as e:  # noqa:BLE001
+            print(f"Schema notice (safe to ignore if already present): {e}")
+    print("Neo4j schema is ready.")

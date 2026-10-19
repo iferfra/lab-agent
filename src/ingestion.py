@@ -1,25 +1,46 @@
-import hashlib
+import asyncio
+import os
 from pathlib import Path
 
+import aiofiles
 import pymupdf4llm
-from fastapi import HTTPException, UploadFile, status
-from langchain_chroma import Chroma
+from langchain_aws import ChatBedrockConverse
 from langchain_community.document_loaders import UnstructuredMarkdownLoader
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pydantic import BaseModel, Field
 
 from src.graph import build_upload_graph
 
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=int(os.getenv("CHUNK_SIZE", "1500")),
+    chunk_overlap=int(os.getenv("CHUNK_OVERLAP", "200")),
+)
 
-class IndexingProcessError(Exception):
-    """Exception raised when the ingestion fails. Doing rollback of the chunks."""
+extract_llm = ChatBedrockConverse(
+    model_id="us.amazon.nova-lite-v1:0",
+    region_name="us-east-1",
+    temperature=0.0,
+)
 
-    def __init__(self, message, added_ids):
-        super().__init__(message)
-        self.added_ids = added_ids
+ingestion_queue = asyncio.Queue()
+ingestion_status = {}
 
 
-class DocumentAlreadyIndexedError(Exception):
-    """Exception raised when all chunks have already been processed (repeated document)"""
+class ExtractMetadata(BaseModel):
+    """Metadata to be extracted from the text provided."""
+
+    year: str = Field(description="Year when the paper was published.")
+    paper_title: str = Field(
+        description="Paper title. Well formatted as it appears in the text."
+    )
+    authors: list[str] = Field(
+        description="List of authors of the paper. Well formatted."
+    )
+    doi: str = Field(description="DOI of the paper.")
+    venue: str = Field(description="Venue where the paper was published.")
+    abstract: str = Field(description="Complete abstract of the paper.")
+    repository_link: str = Field(description="Link of the repository. Ex: GitHub")
 
 
 def pdf_to_md(pdf_path: Path, output_path: Path):
@@ -30,75 +51,74 @@ def pdf_to_md(pdf_path: Path, output_path: Path):
         return True
     except Exception as e:  # noqa: BLE001
         print(f"Error processing file: {e}")
+        return False
 
 
-async def validate_pdf(file: UploadFile) -> bool:
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Not permitted extension. File '{file.filename}' must be .pdf",
-        )
+async def extract_metadata(file_metadata) -> dict:
 
-    if file.content_type != "application/pdf":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Mime type is not application/pdf",
-        )
-    try:
-        first_bytes = await file.read(5)
-        await file.seek(0)
-        if first_bytes != b"%PDF-":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Content validation failed.",
+    async with aiofiles.open(file_metadata["md_path"], "r", encoding="utf-8") as f:
+        paper_text = await f.read(4000)
+
+    extraction_llm = extract_llm.with_structured_output(ExtractMetadata)
+
+    messages = [
+        SystemMessage(
+            content=(
+                "You are an expert scientific metadata extraction assistant. "
+                "Analyze the provided text excerpt from a research paper and extract the requested metadata accurately. "
+                "If a field cannot be found in the text, leave it empty or omit it."
             )
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Intern error processing the file: {e!s}",
-        )
-    return True
+        ),
+        HumanMessage(
+            content=(
+                "Please extract the metadata from the following beginning section of the paper:\n\n"
+                f"{paper_text}"
+            )
+        ),
+    ]
+
+    extracted_metadata = extraction_llm.invoke(messages)
+
+    for metadata_field in extracted_metadata.model_dump():
+        if metadata_field not in file_metadata:
+            file_metadata[metadata_field] = extracted_metadata.model_dump()[
+                metadata_field
+            ]
+    return file_metadata
 
 
-def chunk_index_document(
-    text_splitter: RecursiveCharacterTextSplitter,
-    vector_store: Chroma,
-    document_path: Path,
-):
-    ids = []
+async def ingest_document(neo4j_graph, file_metadata: Path):
+
     try:
-        loader = UnstructuredMarkdownLoader(document_path)
+        file_metadata = await extract_metadata(file_metadata=file_metadata)
+        loader = UnstructuredMarkdownLoader(file_metadata["md_path"])
         docs = loader.load()
         splits = text_splitter.split_documents(docs)
 
-        # We use hash id to prevent duplicated chunks in db (based in chunk content)
+        build_upload_graph(neo4j_graph, splits, file_metadata)
 
-        for split in splits:
-            unique_string = split.page_content
-            chunk_id = hashlib.md5(unique_string.encode("utf-8")).hexdigest()
-            ids.append(chunk_id)
+    except Exception as e:  # noqa:BLE001
+        raise Exception(f"IndexingProcessError: {e}")  # noqa: TRY002
 
-        existing_data = vector_store.get(ids=ids)
-        existing_ids = set(existing_data.get("ids", []))
 
-        if len(existing_ids) == len(splits):
-            print(
-                f"Document '{document_path.name}' hasn't changed (all chunks exist in the DB)."
+async def ingestion_queue_worker(app):
+    while True:
+        file_metadata = await ingestion_queue.get()
+        neo4j_graph = app.state.neo4j_graph
+
+        try:
+            ingestion_status[file_metadata["file_name"]] = "processing"
+            converted = await asyncio.to_thread(
+                pdf_to_md, file_metadata["file_path"], file_metadata["md_path"]
             )
-            raise DocumentAlreadyIndexedError(
-                f"Document {document_path.name} already indexed."
-            )
 
-        # Add chunks to the vector store
-        added_ids = vector_store.add_documents(documents=splits, ids=ids)
-        print(f"Indexed {len(splits)} chunks.")
+            if converted:
+                await ingest_document(neo4j_graph, file_metadata)
+            ingestion_status[file_metadata["file_name"]] = "completed"
 
-        # Add chunks to the knowledge graph
-        build_upload_graph(splits)
-        return added_ids
-
-    except DocumentAlreadyIndexedError:
-        raise
-    except Exception as e:  # noqa: BLE001
-        print(f"Error processing the file: {e}")
-        raise IndexingProcessError(f"Error in pipeline: {e}", added_ids=added_ids)
+        except Exception:  # noqa: BLE001
+            ingestion_status[file_metadata["file_name"]] = "failed"
+            file_metadata["file_path"].unlink(missing_ok=True)
+            file_metadata["md_path"].unlink(missing_ok=True)
+        finally:
+            ingestion_queue.task_done()

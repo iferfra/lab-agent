@@ -1,128 +1,99 @@
-import asyncio
+import os
 from pathlib import Path
 from typing import Annotated
 
 import aiofiles
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
-from langchain_chroma import Chroma
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from fastapi import APIRouter, Form, HTTPException, UploadFile, status
 
-from app.dependencies import get_text_splitter, get_vector_store
-from src.graph import rollback_neo4j
-from src.ingestion import (
-    DocumentAlreadyIndexedError,
-    IndexingProcessError,
-    chunk_index_document,
-    pdf_to_md,
-    validate_pdf,
-)
+from src.ingestion import ingestion_queue, ingestion_status
 
 ingest_router = APIRouter()
-
-UPLOAD_DIR = Path("data/docs/")
-
-ingestion_queue = asyncio.Queue()
-ingestion_status = {}
+UPLOAD_DIR = Path(os.getenv("DATA_DIR", "data/docs/"))
 
 
-async def queue_worker():
-    while True:
-        (
-            file_path,
-            md_path,
-            filename,
-            text_splitter,
-            vector_store,
-        ) = await ingestion_queue.get()
+async def validate_pdf(file: UploadFile) -> bool:
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Not permitted extension. File '{file.filename}' must be .pdf",
+        )
 
-        added_ids = []
-        try:
-            ingestion_status[filename] = "processing"
-
-            converted = await asyncio.to_thread(pdf_to_md, file_path, md_path)
-            if converted:
-                added_ids = await asyncio.to_thread(
-                    chunk_index_document, text_splitter, vector_store, md_path
-                )
-
-            ingestion_status[filename] = "completed"
-
-        except DocumentAlreadyIndexedError:
-            ingestion_status[filename] = "completed"
-            print(f"Skipped ingestion for {filename} (already up to date).")
-
-        except IndexingProcessError as err:
-            added_ids = err.added_ids
-
-            if added_ids:
-                try:
-                    await asyncio.to_thread(vector_store.delete, ids=added_ids)
-                    print(f"Rollback: {len(added_ids)} chunks deleted from Chroma.")
-                except Exception as del_err:  # noqa: BLE001
-                    print(f"Error trying to clean Chroma: {del_err}")
-
-            if added_ids:
-                await asyncio.to_thread(rollback_neo4j, added_ids)
-
-            ingestion_status[filename] = "failed"
-
-        except Exception as general_err:  # noqa: BLE001
-            print(f"Unexpected error for {filename}: {general_err}")
-            ingestion_status[filename] = "failed"
-
-        finally:
-            file_path.unlink(missing_ok=True)
-            md_path.unlink(missing_ok=True)
-            print(f"Cleaned temp files for: {filename}")
-            ingestion_queue.task_done()
-
-
-@ingest_router.post("/ingest")
-async def upload_ingest(
-    files: list[UploadFile],
-    text_splitter: Annotated[
-        RecursiveCharacterTextSplitter, Depends(get_text_splitter)
-    ],
-    vector_store: Annotated[Chroma, Depends(get_vector_store)],
-):
-
-    for file in files:
-        if await validate_pdf(file):
-            file_path = UPLOAD_DIR / Path("pdf") / file.filename
-            if not file_path.is_file():
-                file_path.parent.mkdir(exist_ok=True, parents=True)
-
-                async with aiofiles.open(file_path, "wb") as buffer:
-                    while chunk := await file.read(64 * 1024):
-                        await buffer.write(chunk)
-
-                md_path = (
-                    UPLOAD_DIR
-                    / Path("md")
-                    / Path(file.filename.rsplit(".", 1)[0] + ".md")
-                )
-                md_path.parent.mkdir(exist_ok=True, parents=True)
-
-                ingestion_status[file.filename] = "pending"
-                await ingestion_queue.put(
-                    (file_path, md_path, file.filename, text_splitter, vector_store)
-                )
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"{file.filename} already uploaded and indexed",
-                )
-
-        else:
+    if file.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mime type is not application/pdf",
+        )
+    try:
+        first_bytes = await file.read(5)
+        await file.seek(0)
+        if first_bytes != b"%PDF-":
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"{file.filename} couldn't be uploaded: It's not a pdf",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Content validation failed.",
+            )
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Intern error processing the file: {e!s}",
+        )
+    return True
+
+
+@ingest_router.post("/ingest/paper")
+async def upload_ingest_paper(
+    # request: Request,
+    file: UploadFile,
+    paper_title: Annotated[None, Form()],
+    authors: list[Annotated[None, Form()]],
+    doi: Annotated[None, Form()],
+    venue: Annotated[None, Form()],
+    year: Annotated[None, Form()],
+    abstract: Annotated[None, Form()],
+    repository_link: Annotated[None, Form()],
+):
+    if await validate_pdf(file):
+        file_path = UPLOAD_DIR / Path("pdf") / file.filename
+        if not file_path.is_file():
+            file_path.parent.mkdir(exist_ok=True, parents=True)
+
+            async with aiofiles.open(file_path, "wb") as buffer:
+                while chunk := await file.read(64 * 1024):
+                    await buffer.write(chunk)
+
+            md_path = (
+                UPLOAD_DIR / Path("md") / Path(file.filename.rsplit(".", 1)[0] + ".md")
+            )
+            md_path.parent.mkdir(exist_ok=True, parents=True)
+
+            file_metadata = {
+                "file_name": file.filename,
+                "file_path": file_path,
+                "md_path": md_path,
+            }
+
+            form_metadata = {
+                "paper_title": paper_title,
+                "authors": authors,
+                "doi": doi,
+                "venue": venue,
+                "year": year,
+                "abstract": abstract,
+                "repository_link": repository_link,
+            }
+
+            file_metadata.update(
+                {k: v for k, v in form_metadata.items() if v is not None}
             )
 
-    return {
-        "status": "Upload done correctly. Ingestion started for all files.'",
-        "filenames": [file.filename for file in files],
-    }
+            ingestion_status[file.filename] = "pending"
+
+            await ingestion_queue.put(file_metadata)
+    else:
+        raise HTTPException(
+            status_code=400, detail=f"{file.filename} is not a valid PDF"
+        )
+
+    return {"status": "Ingestion started", "filename": [file.filename]}
 
 
 @ingest_router.get("/ingest/status")
