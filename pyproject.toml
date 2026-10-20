@@ -1,9 +1,10 @@
 [project]
 name = "lab-agent"
 version = "0.1.0"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "aiofiles>=25.1.0",
+    "chainlit>=2.12.0",
     "dotenv>=0.9.9",
     "fastapi[standard]>=0.142.4",
     "langchain>=1.4.3",

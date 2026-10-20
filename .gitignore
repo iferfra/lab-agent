@@ -7,3 +7,5 @@ chroma_db/
 tmp/
 .python-version
 chroma-data/
+.chainlit/
+.ruff_cache/

@@ -1,3 +1,4 @@
+from langchain_core.prompts import PromptTemplate
 from langchain_core.tools import tool
 from langchain_neo4j import GraphCypherQAChain
 
@@ -5,12 +6,32 @@ from src.agent.llm import agent_llm, embedder
 
 graph = None
 
+CYPHER_PROMPT_TEMPLATE = """You are an expert Neo4j Cypher translator.
+Given an input question, create a syntactically correct Cypher query to run.
+
+### CRITICAL RULES FOR CYPHER GENERATION:
+1. NEVER use `RETURN p` or return raw nodes alone. 
+2. ALWAYS project explicit fields with aliases, including connecting entities (like Author names) so the context is preserved in the output.
+   - ❌ FORBIDDEN: `MATCH (a:Author)-[:WROTE]->(p:Paper) RETURN p`
+   - ✅ MANDATORY: `MATCH (a:Author)-[:WROTE]->(p:Paper) RETURN a.name AS author_name, p.title AS title, p.id AS paper_id, p.year AS year`
+
+Schema:
+{schema}
+
+Question: {question}
+CypherQuery:"""
+
+CUSTOM_CYPHER_PROMPT = PromptTemplate(
+    input_variables=["schema", "question"], template=CYPHER_PROMPT_TEMPLATE
+)
+
 
 @tool
 def search_knowledge_graph(query: str) -> str:
     """Useful for structural queries, metadata, entity counts, or direct relationships
 
-    between graph entities (such as authors, papers, datasets, metrics, or institutions)
+    between graph entities (such as authors, papers, datasets, metrics, or
+    institutions)
     by automatically generating and executing Cypher queries.
 
     Args:
@@ -20,16 +41,32 @@ def search_knowledge_graph(query: str) -> str:
         return "Error: Graph database client is not initialized."
 
     try:
-        # Initialize LangChain's GraphCypherQAChain for Text-to-Cypher translation
+        # 2. Inicializamos la cadena inyectando el prompt personalizado
         chain = GraphCypherQAChain.from_llm(
             llm=agent_llm,
             graph=graph,
             verbose=True,
-            allow_dangerous_requests=True,  # Required for executing custom generated Cypher
+            validate_cypher=True,
+            allow_dangerous_requests=True,
+            cypher_prompt=CUSTOM_CYPHER_PROMPT,  # 👈 AQUÍ FORZAMOS EL RETURN CORRECTO
+            return_intermediate_steps=True,
         )
         response = chain.invoke({"query": query})
-        return response.get("result", "No results found in the graph.")
-    except Exception as e:  # noqa:BLE001
+
+        # 3. Extraemos el resultado crudo de Neo4j para dárselo limpio al agente
+        intermediate = response.get("intermediate_steps", [])
+        if len(intermediate) >= 2 and "context" in intermediate[1]:
+            context_data = intermediate[1]["context"]
+            if context_data:
+                return str(context_data)
+
+        final_result = response.get("result")
+        if final_result and "I don't know" not in str(final_result):
+            return str(final_result)
+
+        return "No records found in the knowledge graph matching this query."
+
+    except Exception as e:  # noqa: BLE001
         return f"Error executing knowledge graph search: {e!s}"
 
 
