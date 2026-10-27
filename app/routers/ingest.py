@@ -8,7 +8,7 @@ from fastapi import APIRouter, Form, HTTPException, UploadFile, status
 from src.ingestion import ingestion_queue, ingestion_status
 
 ingest_router = APIRouter()
-UPLOAD_DIR = Path(os.getenv("DATA_DIR", "data/docs/"))
+UPLOAD_DIR = Path(os.getenv("DATA_DIR", "data/") + "docs")
 
 
 async def validate_pdf(file: UploadFile) -> bool:

@@ -4,15 +4,17 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_neo4j import Neo4jGraph
 
+load_dotenv()
 # --------------------------------------------------
 # Configuration
 # --------------------------------------------------
 
-INPUT_PATH = Path("data/eval/validated_candidates.jsonl")
-OUTPUT_PATH = Path("data/eval/run_results.jsonl")
+INPUT_PATH = Path(os.getenv("DATA_DIR", "data/") + "eval/validated_candidates.jsonl")
+OUTPUT_PATH = Path(os.getenv("DATA_DIR", "data/") + "eval/run_results.jsonl")
 
 MAX_MODEL_CALLS = 5
 SAVE_AGENT_CONFIG = True

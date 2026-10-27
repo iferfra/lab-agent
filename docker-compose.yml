@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./app/Dockerfile
+    container_name: lab_api
+    ports:
+      - "8000:8000"
+
+    env_file:
+      - .env
+    volumes:
+      - lab_data:/data
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./frontend/Dockerfile
+    depends_on:
+      - api
+    container_name: lab_frontend
+    ports:
+      - "10000:10000"
+    environment:
+      - API_URL=http://api:8000/chat
+
+volumes:
+  lab_data:

@@ -1,14 +1,20 @@
 # src/evaluation/validate_questions.py
 
 import json
+import os
 import re
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
 # Configuration
-INPUT_PATH = Path("data/eval/candidates.jsonl")
-SOURCES_PATH = Path("data/eval/source_bundle.json")
-VALIDATED_PATH = Path("data/eval/validated_candidates.jsonl")
-REJECTED_PATH = Path("data/eval/rejected_questions.jsonl")
+INPUT_PATH = Path(os.getenv("DATA_DIR", "data/") + "eval/candidates.jsonl")
+SOURCES_PATH = Path(os.getenv("DATA_DIR", "data/") + "eval/source_bundle.json")
+VALIDATED_PATH = Path(
+    os.getenv("DATA_DIR", "data/") + "eval/validated_candidates.jsonl"
+)
+REJECTED_PATH = Path(os.getenv("DATA_DIR", "data/") + "eval/rejected_questions.jsonl")
 
 EXPECTED_TOOLS = {
     "graph": {"search_knowledge_graph"},

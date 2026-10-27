@@ -14,8 +14,8 @@ from eval.llm import eval_llm
 load_dotenv()
 
 # Configuration
-INPUT_PATH = Path("data/eval/source_bundle.json")
-OUTPUT_PATH = Path("data/eval/candidates.jsonl")
+INPUT_PATH = Path(os.getenv("DATA_DIR", "data/") + "eval/source_bundle.json")
+OUTPUT_PATH = Path(os.getenv("DATA_DIR", "data/") + "eval/candidates.jsonl")
 
 CATEGORY = "unanswerable"  # hybrid, semantic, graph, unanswerable
 NUM_QUESTIONS = 20

@@ -13,10 +13,12 @@ from eval.llm import eval_llm
 load_dotenv()
 
 # Files
-BENCHMARK_PATH = Path("data/eval/validated_candidates.jsonl")
-RUN_RESULTS_PATH = Path("data/eval/run_results.jsonl")
-RESULTS_PATH = Path("data/eval/evaluation_results.jsonl")
-SUMMARY_PATH = Path("data/eval/evaluation_summary.json")
+BENCHMARK_PATH = Path(
+    os.getenv("DATA_DIR", "data/") + "eval/validated_candidates.jsonl"
+)
+RUN_RESULTS_PATH = Path(os.getenv("DATA_DIR", "data/") + "eval/run_results.jsonl")
+RESULTS_PATH = Path(os.getenv("DATA_DIR", "data/") + "eval/evaluation_results.jsonl")
+SUMMARY_PATH = Path(os.getenv("DATA_DIR", "data/") + "eval/evaluation_summary.json")
 
 # Bedrock
 EVALUATION_MODEL = os.getenv("EVALUATION_LLM")
