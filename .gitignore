@@ -1,0 +1,11 @@
+.venv/
+.vscode/
+__pycache__/
+data/
+.env
+chroma_db/
+tmp/
+.python-version
+chroma-data/
+.chainlit/
+.ruff_cache/
