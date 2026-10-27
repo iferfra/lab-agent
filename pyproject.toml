@@ -29,7 +29,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "datasets>=5.1.0",
     "ipython>=9.17.1",
     "pytest>=9.1.1",
+    "ragas>=0.4.3",
     "ruff>=0.16.10",
 ]

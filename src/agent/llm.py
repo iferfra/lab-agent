@@ -1,9 +1,12 @@
+import os
+
 from dotenv import load_dotenv
 from langchain_aws import BedrockEmbeddings, ChatBedrockConverse
 
 load_dotenv()
+
 agent_llm = ChatBedrockConverse(
-    model_id="us.amazon.nova-2-lite-v1:0",
+    model_id=os.getenv("AGENT_LLM"),
     region_name="us-east-1",
     temperature=0.0,
 )

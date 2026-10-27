@@ -6,6 +6,12 @@ from src.agent.llm import agent_llm, embedder
 
 graph = None
 
+
+def initialize_graph(neo4j_graph):
+    global graph
+    graph = neo4j_graph
+
+
 CYPHER_PROMPT_TEMPLATE = """You are an expert Neo4j Cypher translator.
 Given an input question, create a syntactically correct Cypher query to run.
 
@@ -28,14 +34,13 @@ CUSTOM_CYPHER_PROMPT = PromptTemplate(
 
 @tool
 def search_knowledge_graph(query: str) -> str:
-    """Useful for structural queries, metadata, entity counts, or direct relationships
+    """Retrieve structured facts from the Neo4j knowledge graph.
 
-    between graph entities (such as authors, papers, datasets, metrics, or
-    institutions)
-    by automatically generating and executing Cypher queries.
+    Use for paper metadata, author identities, authorship relationships,
+    entity relationships, and graph-level questions.
 
-    Args:
-        query: The natural language question regarding the graph structure.
+    Do not use this tool as the only source for details cited inside
+    paper text, such as related-work references or specific claims.
     """
     if graph is None:
         return "Error: Graph database client is not initialized."
@@ -72,96 +77,50 @@ def search_knowledge_graph(query: str) -> str:
 
 @tool
 def search_chunks_semantically(query: str) -> str:
-    """Useful for searching conceptual information, methodologies, or deep scientific
+    """Search the original text chunks of research papers using vector similarity.
 
-    findings across text chunks (:Document nodes) of papers using vector similarity
-    search against the 'documentVectorIndex'.
+    Use this tool to verify specific scientific claims, technical details,
+    experimental results, named entities, cited authors, and references
+    such as 'Wu et al.'.
 
-    Args:
-        query: The conceptual or technical question to search in text embeddings.
+    Use it whenever a question asks for evidence from a paper's text.
+    Do not conclude that a fact is absent based only on a paper summary.
     """
+
     if graph is None:
         return "Error: Database client is not initialized."
 
     try:
-        # 1. Generate embedding for the search query
         query_vector = embedder.embed_query(query)
 
-        # 2. Query the Neo4j vector index created in init_neo4j_schema
         vector_query = """
-        CALL db.index.vector.queryNodes('documentVectorIndex', 5, $embedding)
-        YIELD node, score
-        RETURN node.text AS text, score
-        """
-        results = graph.query(vector_query, params={"embedding": query_vector})
+CALL db.index.vector.queryNodes('documentVectorIndex', 5, $embedding)
+YIELD node, score
+RETURN node.id AS chunk_id, node.text AS text, score
+ORDER BY score DESC
+"""
+
+        results = graph.query(
+            vector_query,
+            params={"embedding": query_vector},
+        )
 
         if not results:
             return "No relevant text chunks found via semantic search."
 
         formatted_chunks = []
+
         for r in results:
-            formatted_chunks.append(f"Relevance Score: {r['score']:.4f}\n{r['text']}")
-
-        return "\n\n---\n\n".join(formatted_chunks)
-    except Exception as e:  # noqa:BLE001
-        return f"Error during semantic chunk search: {e!s}"
-
-
-@tool
-def get_paper_summary_and_chunks(query: str) -> str:
-    """Useful when you have a specific paper title or paper ID and need to retrieve
-
-    its associated text chunks (:Document connected via :PART_OF) from the graph
-    to perform a deep analysis, extract conclusions, or generate a comprehensive summary.
-
-    Args:
-        query: The title, part of the title, or unique paper ID.
-    """
-    if graph is None:
-        return "Error: Database client is not initialized."
-
-    try:
-        # Match paper and its connected chunks using your exact schema relationship: (:Document)-[:PART_OF]->(:Paper)
-        cypher_query = """
-        MATCH (p:Paper)
-        WHERE toLower(p.title) CONTAINS toLower($query) OR p.id = $query
-        MATCH (d:Document)-[:PART_OF]->(p)
-        RETURN p.title AS title, p.year AS year, p.venue AS venue, collect(d.text) AS chunks
-        LIMIT 1
-        """
-        result = graph.query(cypher_query, params={"query": query})
-
-        if not result:
-            return f"No paper found matching '{query}'."
-
-        paper_data = result[0]
-        paper_title = paper_data.get("title", "Unknown Title")
-        year = paper_data.get("year", "N/A")
-        venue = paper_data.get("venue", "N/A")
-        chunks = paper_data.get("chunks", [])
-
-        if not chunks:
-            return (
-                f"Found paper '{paper_title}', but no associated text chunks were"
-                " found."
+            formatted_chunks.append(
+                f"Chunk ID: {r['chunk_id']}\n"
+                f"Relevance Score: {r['score']:.4f}\n"
+                f"{r['text']}"
             )
 
-        # Combine key chunks (limiting to avoid token limits)
-        combined_text = "\n".join(chunks[:8])
+        return "\n\n---\n\n".join(formatted_chunks)
 
-        prompt = (
-            f"Provide a clear, structured scientific summary of the following"
-            f" text chunks belonging to the paper '{paper_title}' (Published in"
-            f" {year}, Venue: {venue}):\n\n{combined_text}"
-        )
-        summary_response = agent_llm.invoke(prompt)
-
-        return (
-            f"### Paper Summary: {paper_title} ({year})\nVenue: {venue}\n\n"
-            f"{summary_response.content}"
-        )
-    except Exception as e:  # noqa:BLE001
-        return f"Error retrieving paper summary and chunks: {e!s}"
+    except Exception as e:  # noqa: BLE001
+        return f"Error during semantic chunk search: {e!s}"
 
 
 @tool
@@ -179,7 +138,6 @@ def find_entity_connections(query: str) -> str:
         return "Error: Database client is not initialized."
 
     try:
-        # Leverages GraphCypherQAChain to translate path/connection requests into accurate Cypher path queries
         chain = GraphCypherQAChain.from_llm(
             llm=agent_llm,
             graph=graph,
@@ -199,6 +157,5 @@ def find_entity_connections(query: str) -> str:
 ALL_TOOLS = [
     search_knowledge_graph,
     search_chunks_semantically,
-    get_paper_summary_and_chunks,
-    find_entity_connections,
+    # find_entity_connections,
 ]

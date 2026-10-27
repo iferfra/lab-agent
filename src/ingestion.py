@@ -10,7 +10,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel, Field
 
-from src.graph import build_upload_graph
+from src.graph.graph import build_upload_graph
 
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=int(os.getenv("CHUNK_SIZE", "1500")),

@@ -41,15 +41,14 @@ async def validate_pdf(file: UploadFile) -> bool:
 
 @ingest_router.post("/ingest/paper")
 async def upload_ingest_paper(
-    # request: Request,
     file: UploadFile,
-    paper_title: Annotated[None, Form()],
-    authors: list[Annotated[None, Form()]],
-    doi: Annotated[None, Form()],
-    venue: Annotated[None, Form()],
-    year: Annotated[None, Form()],
-    abstract: Annotated[None, Form()],
-    repository_link: Annotated[None, Form()],
+    paper_title: Annotated[str | None, Form()] = None,
+    authors: Annotated[list[str] | None, Form()] = None,
+    doi: Annotated[str | None, Form()] = None,
+    venue: Annotated[str | None, Form()] = None,
+    year: Annotated[int | None, Form()] = None,
+    abstract: Annotated[str | None, Form()] = None,
+    repository_link: Annotated[str | None, Form()] = None,
 ):
     if await validate_pdf(file):
         file_path = UPLOAD_DIR / Path("pdf") / file.filename
