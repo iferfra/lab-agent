@@ -24,7 +24,7 @@ services:
     ports:
       - "10000:10000"
     environment:
-      - API_URL=http://api:8000/chat
+      - API_UPSTREAM=http://api:8000
 
 volumes:
   lab_data:

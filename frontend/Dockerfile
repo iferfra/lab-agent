@@ -1,14 +1,19 @@
-FROM python:3.12-slim
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
 
-RUN uv sync --frozen --group frontend --no-dev --no-install-project --no-install-workspace
+COPY frontend/ ./
+RUN npm run build
 
-COPY ./frontend ./frontend
+
+FROM nginx:1.27-alpine
+
+COPY frontend/nginx.conf /etc/nginx/templates/default.conf.template
+COPY --from=build /app/dist /usr/share/nginx/html
+
+ENV API_UPSTREAM=http://api:8000
 
 EXPOSE 10000
-
-CMD ["uv", "run", "chainlit", "run", "frontend/app.py", "--host", "localhost", "--port", "10000"]
