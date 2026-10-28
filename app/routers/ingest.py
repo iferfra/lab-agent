@@ -1,3 +1,4 @@
+import hashlib
 import os
 from pathlib import Path
 from typing import Annotated
@@ -9,6 +10,34 @@ from src.ingestion import ingestion_queue, ingestion_status
 
 ingest_router = APIRouter()
 UPLOAD_DIR = Path(os.getenv("DATA_DIR", "data/") + "docs")
+
+
+async def calculate_file_hash(file: UploadFile) -> str:
+    sha256 = hashlib.sha256()
+
+    await file.seek(0)
+
+    while chunk := await file.read(64 * 1024):
+        sha256.update(chunk)
+
+    await file.seek(0)
+
+    return sha256.hexdigest()
+
+
+async def is_new_pdf(file: UploadFile, upload_dir: Path) -> bool:
+    sha256 = hashlib.sha256()
+
+    await file.seek(0)
+    while chunk := await file.read(64 * 1024):
+        sha256.update(chunk)
+
+    await file.seek(0)
+
+    file_hash = sha256.hexdigest()
+    file_path = upload_dir / "pdf" / f"{file_hash}.pdf"
+
+    return not file_path.is_file()
 
 
 async def validate_pdf(file: UploadFile) -> bool:
@@ -51,17 +80,17 @@ async def upload_ingest_paper(
     repository_link: Annotated[str | None, Form()] = None,
 ):
     if await validate_pdf(file):
-        file_path = UPLOAD_DIR / Path("pdf") / file.filename
-        if not file_path.is_file():
+        file_hash = await calculate_file_hash(file)
+        file_path = UPLOAD_DIR / "pdf" / f"{file_hash}.pdf"
+
+        if await is_new_pdf(file, UPLOAD_DIR):
             file_path.parent.mkdir(exist_ok=True, parents=True)
 
             async with aiofiles.open(file_path, "wb") as buffer:
                 while chunk := await file.read(64 * 1024):
                     await buffer.write(chunk)
 
-            md_path = (
-                UPLOAD_DIR / Path("md") / Path(file.filename.rsplit(".", 1)[0] + ".md")
-            )
+            md_path = UPLOAD_DIR / Path("md") / f"{file_hash}.md"
             md_path.parent.mkdir(exist_ok=True, parents=True)
 
             file_metadata = {
