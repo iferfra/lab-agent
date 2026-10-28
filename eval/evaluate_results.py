@@ -50,36 +50,128 @@ prompt = ChatPromptTemplate.from_messages(
         (
             "system",
             """
-You are evaluating a Graph RAG system.
+You are an impartial evaluator of a Graph RAG research assistant.
 
-Use only the benchmark reference and the supplied execution results.
-Do not assume unsupported claims are true.
+Evaluate the agent using only the supplied benchmark item and execution
+results. Do not assume that a claim is true merely because it sounds
+plausible. Do not penalize valid paraphrases or differences in wording.
 
-For scores from 0 to 2:
-0 = incorrect, unsupported, or missing.
-1 = partially correct, supported, or complete.
-2 = correct, well-supported, and complete.
+GENERAL SCORING RULES
+For metrics scored from 0 to 2:
+- 0 = incorrect, absent, or substantially unsupported.
+- 1 = partially correct, partially supported, or incomplete.
+- 2 = correct, sufficiently supported, and complete.
 
-Evaluate:
-- answer_correctness: Compare the answer with the reference answer.
-- faithfulness: Check whether the answer is supported by retrieved evidence.
-- evidence_coverage: Check whether the required facts are covered.
-- context_precision: Check whether the retrieved information is relevant.
-- context_recall: Check whether the retrieved information contains the facts needed.
-- tool_selection_accuracy: Check whether the selected tools were appropriate.
-- graph_fact_accuracy: Check the accuracy of facts derived from the graph.
-- cross_source_attribution: Check whether graph and semantic evidence are combined
-  and attributed correctly.
+Evaluate each metric independently. A low score on one metric must not
+automatically determine the score of another metric.
 
-For graph_fact_accuracy and cross_source_attribution, return null when not applicable.
+ANSWER CORRECTNESS
+- Compare the meaning of the answer with the expected answer and required
+  facts, not their exact wording.
+- Accept factually equivalent paraphrases and alternative explanations
+  supported by the supplied evidence.
+- Check whether the answer addresses the specific question asked.
+- A relevant discussion of the general topic is not sufficient if it
+  misses the specific fact requested.
+- Do not penalize additional relevant information unless it is incorrect,
+  misleading, or contradicts the reference.
+- Score 0 when the central answer is incorrect or missing.
+- Score 1 when the answer is partly correct but misses an important detail.
+- Score 2 when the answer correctly and sufficiently addresses the question.
 
-For unanswerable questions:
-- abstention_correct = 1 if the agent appropriately says the information is unavailable.
-- abstention_correct = 0 if the agent invents an answer.
-For answerable questions, abstention_correct must be null.
+FAITHFULNESS
+- Evaluate whether factual claims in the answer are supported by the
+  retrieved contexts and tool results supplied in the execution.
+- Do not use disagreement with the expected answer as sufficient reason
+  to assign a low faithfulness score.
+- A response can be faithful to the retrieved evidence but incomplete
+  or incorrect as an answer to the question.
+- A response can match the expected answer but still be unfaithful if
+  its claims are not supported by the retrieved evidence.
+- Penalize unsupported claims, fabricated details, and contradictions
+  with the supplied evidence.
+- Distinguish unsupported claims from claims that are simply not addressed
+  by the available evidence.
+- Do not assume that information absent from the retrieved contexts is
+  false.
+- If evidence is insufficient to verify a claim, explain this limitation.
 
-Do not confuse a missing answer with a runtime error.
-If evidence is insufficient to verify a claim, mention this in the reason.
+EVIDENCE COVERAGE
+- Evaluate whether the final answer includes the required facts listed
+  in the benchmark.
+- Assess each required fact individually.
+- Do not award full coverage merely because the retrieved contexts contain
+  the required facts if the final answer omits them.
+- Accept semantically equivalent statements.
+
+CONTEXT PRECISION
+- Evaluate how much of the retrieved context is relevant to answering
+  the specific question.
+- Distinguish direct evidence from passages that only discuss the same
+  general topic.
+- Do not assume that a high similarity score guarantees relevance.
+
+CONTEXT RECALL
+- Evaluate whether the retrieved contexts contain the evidence needed to
+  answer the question and support the required facts.
+- If the benchmark identifies expected evidence, compare the retrieved
+  contexts with that evidence.
+- Do not evaluate context recall based on whether the final answer
+  successfully uses the retrieved evidence.
+- If the supplied execution does not contain enough information to assess
+  retrieval completeness, use the most defensible score and explain the
+  limitation in the reason.
+
+TOOL SELECTION ACCURACY
+- Evaluate whether the selected tools were appropriate for the information
+  required by the question.
+- Consider the expected tools, the actual tool calls, and the evidence
+  obtained.
+- An additional tool call is not automatically wrong if it provides
+  useful information.
+- Penalize unnecessary tool calls when they add no relevant evidence.
+- Do not confuse tool selection quality with answer correctness.
+
+GRAPH FACT ACCURACY
+- Evaluate claims about graph entities, metadata, authorship, and
+  relationships against the graph tool results.
+- Do not score this metric based on claims supported only by paper text.
+- Return null when the answer contains no relevant graph-derived claims
+  or the metric is not applicable.
+
+CROSS-SOURCE ATTRIBUTION
+- When graph and semantic sources are both relevant, assess whether the
+  answer combines them correctly and attributes claims to the appropriate
+  source.
+- Do not require both sources when the question does not need both.
+- Do not penalize a semantic-only answer merely because it does not use
+  graph evidence when graph evidence is unnecessary.
+- Return null when cross-source attribution is not applicable.
+
+ABSTENTION
+- For unanswerable questions, abstention_correct = 1 if the agent
+  appropriately acknowledges that the answer cannot be established from
+  the available evidence.
+- Set abstention_correct = 0 if the agent presents an unsupported answer
+  as established fact.
+- For answerable questions, abstention_correct must be null.
+- Do not treat an appropriate, qualified answer as an incorrect abstention.
+
+RUNTIME ERRORS
+- Do not confuse a missing answer with a runtime error.
+- Evaluate the answer actually produced, even if some tool calls failed.
+- Mention runtime errors when they materially affect the evaluation.
+
+EVALUATION REASON
+- Provide a concise, evidence-based explanation for the assigned scores.
+- Identify the specific required fact that is missing or incorrect when
+  applicable.
+- For faithfulness, identify unsupported or contradicted claims rather
+  than merely stating that the answer differs from the reference.
+- Do not claim that a fact is present in a retrieved context unless it
+  can be found in the supplied execution results.
+- If the supplied information is insufficient to make a reliable
+  judgment, explicitly state that limitation.
 """,
         ),
         (
@@ -134,6 +226,9 @@ for run in runs:
     if item is None:
         print(f"Skipping {question_id}: not found in benchmark.")
         continue
+
+    if item["category"] == "unanswerable":
+        print("Debug unanswerable")
 
     expected_tools = set(item.get("expected_tools", []))
 

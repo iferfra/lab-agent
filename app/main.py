@@ -10,6 +10,7 @@ from langchain_neo4j import Neo4jGraph
 
 import src.agent.tools as tool_module
 from app.routers.chat import chat_router
+from app.routers.documents import document_router
 from app.routers.ingest import ingest_router
 from src.graph.graph import init_neo4j_schema
 from src.ingestion import ingestion_queue_worker
@@ -58,6 +59,7 @@ app.add_middleware(
 
 app.include_router(ingest_router)
 app.include_router(chat_router)
+app.include_router(document_router)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
