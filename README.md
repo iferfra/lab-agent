@@ -1,5 +1,7 @@
 # Lab Agent: GraphRAG over research papers
 
+[![CI](https://github.com/iferfra/lab-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/iferfra/lab-agent/actions/workflows/ci.yml)
+
 An assistant that answers questions about scientific papers by combining a
 **knowledge graph** (who wrote what, which methods, datasets and metrics each
 paper uses) with **semantic search** over the papers' text.
@@ -331,41 +333,57 @@ uv run pytest
 uv run ruff check . && uv run ruff format --check .
 ```
 
+The same checks run on GitHub Actions on every push and pull request
+(`.github/workflows/ci.yml`): lint and tests, a type-checked frontend build, and
+a build of both Docker images. They need no secrets.
+
 The `eval` and `src` modules are run as packages from the repository root
 (`uv run python -m eval.run …`), not as scripts.
 
 ## Results
 
-First run of the hybrid agent (all three tools) over the 17-question benchmark
-(`eval/results.md`):
+The same 17 questions, answered by the agent with three different sets of
+tools (`eval/results.md`):
 
-| | Questions | Fact recall | Faithfulness | Abstention | Context recall | Source accuracy |
-|---|---|---|---|---|---|---|
-| All | 17 | 96% | 100% | 100% | 56% | 71% |
-| graph | 5 | 95% | 100% | | | 80% |
-| semantic | 6 | 100% | 100% | | 50% | 50% |
-| hybrid | 2 | 90% | 100% | | 75% | 100% |
-| unanswerable | 4 | | 100% | 100% | | 75% |
+| Variant | Tools | Fact recall | Faithfulness | Abstention | Context recall | Latency (median) | Tokens / question |
+|---|---|---|---|---|---|---|---|
+| **hybrid** | graph + text | **96%** | **100%** | 100% | **56%** | 4.6 s | 8,976 |
+| vector | text only | 82% | 99% | 100% | 50% | 3.3 s | 7,673 |
+| graph | graph only | 83% | 87% | 100% | — | 9.9 s | 12,495 |
 
-Median latency is 4.6 s per answer, using about 9,000 tokens on average.
+Fact recall by question category:
 
-How to read it:
+| Variant | graph (5) | semantic (6) | hybrid (2) |
+|---|---|---|---|
+| hybrid | 95% | 100% | 90% |
+| vector | 73% | 100% | 50% |
+| graph | 95% | 67% | 100% |
 
-- **The answers are right and grounded.** No claim in any answer is
-  unsupported by the retrieved context, and the agent says "I don't know" to
-  all four questions about things the papers do not contain.
-- **Retrieval is the weak spot.** Context recall is 56%: the agent often
-  answers from a different chunk than the one a question was written from.
-  Since fact recall stays high this is partly a limit of the metric (see
-  [Known limitations](#known-limitations)), but it is also where to improve
-  first.
-- **Source accuracy is strict.** Most misses are semantic questions where the
-  agent also queried the graph. That costs a tool call but does not change the
-  answer.
-- Fact recall and faithfulness this close to 100% mean the benchmark is still
-  easy and small. The next steps are more and harder hybrid questions, and the
-  `vector` and `graph` ablation runs that show what the graph adds.
+What the comparison shows:
 
+- **The two retrieval paths are complementary, and the hybrid agent gets the
+  best of both.** Text search alone fails questions that need a complete list,
+  such as "which datasets and metrics does the paper use?": it answers from
+  whichever chunks it happens to retrieve. The graph alone cannot answer
+  questions about details in the text.
+- **Without the text, the agent invents more.** The graph-only variant has 87%
+  faithfulness, the only clear drop. Missing the details, it fills the gaps
+  with claims it cannot support.
+- **The graph alone is the most expensive variant**, not the cheapest. With no
+  text to fall back on, the agent retries Cypher queries: 9.9 s and about 12k
+  tokens per question. The hybrid agent costs only about 17% more tokens than
+  text-only search.
+- **Retrieval is the weak spot.** Context recall is 56%: the right chunk is
+  often missing among the ten the vector search returns.
+- **Source accuracy is not comparable across variants.** A single-tool variant
+  cannot use the sources it does not have, so it is left out of the table. For
+  the hybrid agent it is 71%; most misses are semantic questions where it also
+  queried the graph.
+- **The benchmark is small.** With 17 questions one question is 6 points, and
+  the hybrid category has only two. The direction of the results is clear, but
+  not the exact size of the gaps.
+
+## Costs
 ## Costs
 
 Approximate Bedrock costs measured on this project's two papers (Bedrock

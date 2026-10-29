@@ -1,0 +1,64 @@
+# Checks that run on every push and pull request. None of them call Bedrock or
+# Neo4j, so they need no secrets and cost nothing.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch cancels the run that is still going
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python (lint and tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      # Exactly the versions in uv.lock; fails if the lock is out of date
+      - run: uv sync --frozen
+
+      # The code reads the model ids at import time; the example file has them
+      # and no credentials
+      - run: cp .env.example .env
+
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest
+
+  frontend:
+    name: Frontend (type check and build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      # tsc -b type-checks the whole app before Vite bundles it
+      - run: npm run build
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The compose file needs a .env to exist, even if nothing is started
+      - run: cp .env.example .env
+      - run: docker compose build
