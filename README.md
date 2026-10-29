@@ -391,8 +391,6 @@ What the comparison shows:
   size of the gaps.
 
 ## Costs
-## Costs
-## Costs
 
 Approximate Bedrock costs measured on this project's two papers (Bedrock
 prices change, so check them before running large jobs):
