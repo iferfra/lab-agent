@@ -1,5 +1,17 @@
+"""Turn a paper into the Neo4j knowledge graph (schema in ontology.py).
+
+Extraction happens in two steps:
+1. The whole paper is read once to get its metadata and main entities, each
+   with a canonical name and its aliases ("FER" -> "facial expression
+   recognition", "our model" -> the proposed method). These become the
+   relationships of the Paper node.
+2. Each chunk is linked to the entities it mentions, using those canonical
+   names so that every spelling of an entity ends up in the same node.
+"""
+
 import hashlib
 import os
+import re
 
 from dotenv import load_dotenv
 from langchain_aws import BedrockEmbeddings, ChatBedrockConverse
@@ -8,290 +20,358 @@ from langchain_community.graphs.graph_document import (
     Node,
     Relationship,
 )
+from langchain_core.callbacks import get_usage_metadata_callback
 from langchain_core.documents import Document
-from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_neo4j import Neo4jGraph
 
-from src.graph.extraction_schemas import ChunkExtraction
+from src.graph.extraction_schemas import ChunkMentions, PaperExtraction
+from src.graph.ontology import PAPER_RELATIONSHIPS
+from src.graph.validation import appears_in, is_specific_name, validate_evidence
 
 load_dotenv()
 
 
-EXTRACTION_PROMPT = ChatPromptTemplate.from_messages(
+PAPER_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
             """
-            Extract scientific entities and relationships from the text.
+            You read research papers and extract their metadata and main
+            entities for a knowledge graph.
 
-            ENTITY RULES
-            - Method: A specifically identifiable model, architecture,
-              algorithm, or named technical approach.
-            - Dataset: A specifically identifiable data collection.
-            - Metric: A named quantitative evaluation measure.
-            - Benchmark: An identifiable evaluation suite or protocol.
-            - Task: A specific scientific problem.
-            - Concept: A meaningful scientific concept, mechanism, or theory.
-
-            GENERAL RULES
-            - Extract only information explicitly supported by the text.
-            - Preserve the entity mention as written.
-            - Do not extract generic phrases such as "our method",
-              "training data", "performance", or "proposed approach".
-            - Do not invent entities from domain knowledge.
-            - Do not infer relationships from co-occurrence alone.
-            - Every entity and relationship must have textual evidence.
-            - Evidence must be copied verbatim from the input.
-            - Return empty lists when no valid entities or relationships
-              can be extracted.
+            RULES
+            - Use only what the paper states. Never add entities from your own
+              knowledge.
+            - List each entity once, under its full name, and put abbreviations
+              and other spellings in its aliases. Example: name "facial
+              expression recognition", aliases ["FER"].
+            - Add the phrases the paper uses for its own contribution ("our
+              method", "our model"...) as aliases of the proposed method.
+            - Only specific, named things. No generic phrases ("neural
+              network", "training data", "input image") and no math symbols or
+              variables.
+            - Leave a metadata field empty if the paper does not state it.
             """,
         ),
-        (
-            "human",
-            "Extract knowledge from this chunk:\n\n{chunk_text}",
-        ),
+        ("human", "Paper:\n\n{paper_text}"),
     ]
 )
+
+CHUNK_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """
+            Find the entities mentioned in a chunk of the paper "{title}".
+
+            Known entities of this paper:
+            {known_entities}
+
+            RULES
+            - If a mention refers to a known entity, return the known name and
+              type, also when the chunk uses an alias or says "our method".
+            - Other entities can be added only if they are specifically named
+              methods, datasets, metrics or tasks, such as a cited method.
+            - Never return generic phrases ("neural network", "encoder",
+              "input image") or math symbols and variables ("d", "θ", "x^b").
+            - evidence: the sentence where the entity appears, copied verbatim.
+            - Return an empty list when nothing qualifies.
+            """,
+        ),
+        ("human", "Chunk:\n\n{chunk_text}"),
+    ]
+)
+
+# Parallel chunk extraction calls; higher values get throttled by Bedrock
+MAX_CONCURRENCY = 4
 
 embedder = BedrockEmbeddings(
     region_name="us-east-1", model_id="amazon.titan-embed-text-v2:0", normalize=True
 )
 
-# graph_llm = ChatBedrockConverse(
-#     model_id="us.anthropic.claude-sonnet-4-6",
-#     region_name="us-east-1",
-#     temperature=0.0,
-# )
-
-# price_1m_token_input = 3
-# price_1m_token_output = 15
-
+# Reading a whole paper is a single, harder call, so it gets a stronger model;
+# the many per-chunk calls use the cheaper one.
+paper_llm = ChatBedrockConverse(
+    model_id=os.getenv("PAPER_LLM"),
+    region_name="us-east-1",
+    temperature=0.0,
+    max_tokens=16000,
+)
 graph_llm = ChatBedrockConverse(
     model_id=os.getenv("GRAPH_LLM"),
     region_name="us-east-1",
     temperature=0.0,
 )
 
-price_1m_token_input = 0.33
-price_1m_token_output = 2.75
-
-
-structured_llm = graph_llm.with_structured_output(
-    ChunkExtraction,
-    method="function_calling",
-    include_raw=True,
+paper_extractor = PAPER_PROMPT | paper_llm.with_structured_output(
+    PaperExtraction, method="function_calling"
+)
+mention_extractor = CHUNK_PROMPT | graph_llm.with_structured_output(
+    ChunkMentions, method="function_calling"
 )
 
-
-extractor = EXTRACTION_PROMPT | structured_llm
-
-total_price = 0
+METADATA_FIELDS = ["paper_title", "authors", "year", "venue", "doi", "repository_link"]
 
 
-def extract_chunk(chunk_text: str) -> ChunkExtraction:
-    global total_price  # Permite modificar la variable externa
-
-    response_dict = extractor.invoke({"chunk_text": chunk_text})
-
-    raw_message = response_dict.get("raw")
-    parsed_result = response_dict.get("parsed")
-
-    if isinstance(raw_message, AIMessage) and hasattr(raw_message, "usage_metadata"):
-        usage = raw_message.usage_metadata
-        input_tokens = usage.get("input_tokens", 0)
-        output_tokens = usage.get("output_tokens", 0)
-
-        # print("Input tokens:", input_tokens)
-        # print("Output tokens:", output_tokens)
-
-        price_chunk = (input_tokens * (price_1m_token_input / 1e6)) + (
-            output_tokens * (price_1m_token_output / 1e6)
-        )
-        # print(f"Costo del chunk: ${price_chunk:.6f}")
-        total_price += price_chunk
-    else:
-        print("No se encontraron metadatos de uso.")
-
-    if not isinstance(parsed_result, ChunkExtraction):
-        raise TypeError(f"Expected ChunkExtraction, got {type(parsed_result).__name__}")
-
-    return parsed_result
+def entity_key(name: str) -> str:
+    """Normalize a name so that "Aff-Wild2" and "AffWild2" are one entity."""
+    return re.sub(r"[^a-z0-9]", "", name.lower())
 
 
-def to_graph_document(
-    extraction: ChunkExtraction,
-    source: Document,
-) -> GraphDocument:
-    nodes_by_mention = {}
+def paper_metadata(
+    paper: PaperExtraction, file_metadata: dict, paper_text: str
+) -> dict:
+    """Extracted metadata, overridden by the values the user filled in."""
+    extracted = {
+        field: value
+        for field, value in paper.model_dump(include=set(METADATA_FIELDS)).items()
+        if value not in (None, "", "null")
+    }
+    # The model tends to guess these two when the paper does not state them
+    for field in ("year", "doi"):
+        if field in extracted and not appears_in(str(extracted[field]), paper_text):
+            del extracted[field]
 
-    for entity in extraction.entities:
-        key = (entity.mention.strip(), entity.entity_type)
+    from_user = {f: file_metadata[f] for f in METADATA_FIELDS if f in file_metadata}
+    return extracted | from_user
 
-        if key not in nodes_by_mention:
-            nodes_by_mention[key] = Node(
-                id=entity.mention.strip(),
-                type=entity.entity_type,
-                properties={
-                    "name": entity.mention.strip(),
-                    "evidence": entity.evidence,
-                },
+
+def clean_name(name: str) -> str:
+    """Remove citation markers and HTML: "Multi-PIE [7]" -> "Multi-PIE"."""
+    return re.sub(r"\[[^\]]*\]|<[^>]+>", "", name).strip()
+
+
+def paper_entities(paper: PaperExtraction, paper_text: str) -> list[tuple[str, Node]]:
+    """(relationship from the Paper, entity node) for every main entity whose
+    name or one of its aliases really appears in the paper."""
+    entities = []
+    label_of = {}  # an entity keeps the first label it was given
+
+    for field, (relationship, label) in PAPER_RELATIONSHIPS.items():
+        for entity in getattr(paper, field):
+            name = clean_name(entity.name)
+            key = entity_key(name)
+            aliases = list({clean_name(a) for a in entity.aliases} - {"", name})
+            if not is_specific_name(name) or label_of.get(key, label) != label:
+                continue
+            if not any(appears_in(n, paper_text) for n in [name, *aliases]):
+                continue
+
+            label_of[key] = label
+            node = Node(
+                id=key, type=label, properties={"name": name, "aliases": aliases}
             )
+            entities.append((relationship, node))
 
-    relationships = []
+    return entities
 
-    for rel in extraction.relationships:
-        source_candidates = [
-            node
-            for (mention, _), node in nodes_by_mention.items()
-            if mention == rel.source_mention.strip()
-        ]
-        target_candidates = [
-            node
-            for (mention, _), node in nodes_by_mention.items()
-            if mention == rel.target_mention.strip()
-        ]
 
-        if len(source_candidates) != 1 or len(target_candidates) != 1:
+def describe_entities(nodes: list[Node]) -> str:
+    """The known entities as a list for the chunk prompt."""
+    lines = []
+    for node in nodes:
+        aliases = node.properties["aliases"]
+        also = f" (also: {', '.join(aliases)})" if aliases else ""
+        lines.append(f"- {node.type}: {node.properties['name']}{also}")
+    return "\n".join(lines)
+
+
+def to_chunk_graph_document(
+    extraction: ChunkMentions, chunk: Document, known: dict[str, Node]
+) -> GraphDocument:
+    """Link the chunk to the entities it mentions.
+
+    Mentions of a known entity (by name or alias) go to its node. New entities
+    are kept only if they are specific, and never as Concepts: those come only
+    from the paper-level extraction.
+    """
+    nodes = {}
+
+    for mention in extraction.mentions:
+        if not validate_evidence(mention.evidence, chunk.page_content):
             continue
 
-        relationships.append(
-            Relationship(
-                source=source_candidates[0],
-                target=target_candidates[0],
-                type=rel.relationship_type,
-                properties={
-                    "evidence": rel.evidence,
-                },
+        node = known.get(entity_key(mention.name))
+        if node is None:
+            if mention.entity_type == "Concept" or not is_specific_name(mention.name):
+                continue
+            node = Node(
+                id=entity_key(mention.name),
+                type=mention.entity_type,
+                properties={"name": mention.name.strip()},
             )
-        )
+        nodes[(node.id, node.type)] = node
+
+    return GraphDocument(nodes=list(nodes.values()), relationships=[], source=chunk)
+
+
+def to_paper_graph_document(
+    paper_id: str, properties: dict, authors: list[str], entities: list
+) -> GraphDocument:
+    properties = {k: v for k, v in properties.items() if v is not None}
+    paper = Node(id=paper_id, type="Paper", properties=properties)
+    authors = [Node(id=a, type="Author", properties={"name": a}) for a in authors]
+
+    relationships = [
+        Relationship(source=a, target=paper, type="WROTE") for a in authors
+    ]
+    relationships += [
+        Relationship(source=paper, target=node, type=relationship)
+        for relationship, node in entities
+    ]
 
     return GraphDocument(
-        nodes=list(nodes_by_mention.values()),
+        nodes=[paper, *authors, *(node for _, node in entities)],
         relationships=relationships,
-        source=source,
+        # Required by GraphDocument, but only stored with include_source=True
+        source=Document(page_content=""),
     )
 
 
-def build_upload_graph(graph: Neo4jGraph, chunks: list[Document], file_metadata: dict):
+LINK_CHUNKS_QUERY = """
+UNWIND $chunks AS chunk
+MATCH (d:Document {id: chunk.id})
+MATCH (p:Paper {id: $paper_id})
+SET d.embedding = chunk.embedding
+MERGE (d)-[:PART_OF]->(p)
+"""
 
-    paper_id = hashlib.md5(
-        file_metadata.get("file_name", "unknown").encode("utf-8")
-    ).hexdigest()
-    create_paper_query = """
-    MERGE (p:Paper {id: $paper_id})
-    SET p.title = $title,
-        p.doi = $doi,
-        p.venue = $venue,
-        p.year = $year,
-        p.file_name = $file_name,
-        p.repository_link = $repository_link
-    """
+
+def build_upload_graph(
+    graph: Neo4jGraph,
+    paper_text: str,
+    chunks: list[Document],
+    file_metadata: dict,
+) -> None:
+    paper_id = file_metadata["paper_id"]
+
+    for chunk in chunks:
+        chunk.metadata["id"] = hashlib.md5(
+            f"{paper_id}{chunk.page_content}".encode()
+        ).hexdigest()
+
+    # 1. The LLM work
+    with get_usage_metadata_callback() as usage:
+        paper = paper_extractor.invoke({"paper_text": paper_text})
+        if paper is None:
+            raise RuntimeError("The model did not return the paper extraction")
+
+        metadata = paper_metadata(paper, file_metadata, paper_text)
+        title = metadata.get("paper_title") or file_metadata["file_name"]
+        entities = paper_entities(paper, paper_text)
+        print(f"Paper entities: {[n.properties['name'] for _, n in entities]}")
+
+        # One node per entity, reachable from its name and from every alias
+        unique_nodes = list({(n.id, n.type): n for _, n in entities}.values())
+        known = {}
+        for node in unique_nodes:
+            for name in [node.properties["name"], *node.properties["aliases"]]:
+                known.setdefault(entity_key(name), node)
+
+        extractions = mention_extractor.batch(
+            [
+                {
+                    "title": title,
+                    "known_entities": describe_entities(unique_nodes),
+                    "chunk_text": chunk.page_content,
+                }
+                for chunk in chunks
+            ],
+            config={"max_concurrency": MAX_CONCURRENCY},
+            return_exceptions=True,
+        )
+
+    # The embedded text starts with the paper and section so that a chunk like
+    # "we train on it for 10 epochs" can still be matched to its topic.
+    embeddings = embedder.embed_documents(
+        [f"{title} > {c.metadata['section']}\n\n{c.page_content}" for c in chunks]
+    )
+
+    # A chunk fails with an exception, or with None when the model answers in
+    # plain text instead of calling the extraction function.
+    chunk_documents = []
+    for chunk, extraction in zip(chunks, extractions, strict=True):
+        if not isinstance(extraction, ChunkMentions):
+            print(f"Extraction failed for chunk {chunk.metadata['id']}: {extraction!r}")
+            extraction = ChunkMentions()
+        chunk_documents.append(to_chunk_graph_document(extraction, chunk, known))
+
+    tokens = {"input_tokens": 0, "output_tokens": 0}
+    for model_usage in usage.usage_metadata.values():
+        tokens["input_tokens"] += model_usage["input_tokens"]
+        tokens["output_tokens"] += model_usage["output_tokens"]
+    mentions = sum(len(d.nodes) for d in chunk_documents)
+    print(f"{len(chunks)} chunks, {mentions} mentions, tokens: {tokens}")
+
+    # 2. Write everything to Neo4j. The paper goes first: nodes only get their
+    # properties when they are created, and the paper-level entities carry
+    # the canonical names and aliases.
+    paper_properties = {
+        "title": title,
+        "doi": metadata.get("doi"),
+        "venue": metadata.get("venue"),
+        "year": metadata.get("year"),
+        "repository_link": metadata.get("repository_link"),
+        "file_name": file_metadata["file_name"],
+        "ingestion_input_tokens": tokens["input_tokens"],
+        "ingestion_output_tokens": tokens["output_tokens"],
+    }
+    graph.add_graph_documents(
+        [
+            to_paper_graph_document(
+                paper_id, paper_properties, metadata.get("authors", []), entities
+            )
+        ]
+    )
+    graph.add_graph_documents(chunk_documents, include_source=True)
     graph.query(
-        create_paper_query,
+        LINK_CHUNKS_QUERY,
         params={
             "paper_id": paper_id,
-            "title": file_metadata.get("paper_title"),
-            "doi": file_metadata.get("doi"),
-            "venue": file_metadata.get("venue"),
-            "year": file_metadata.get("year"),
-            "file_name": file_metadata.get("file_name"),
-            "repository_link": file_metadata.get("repository_link"),
+            "chunks": [
+                {"id": chunk.metadata["id"], "embedding": embedding}
+                for chunk, embedding in zip(chunks, embeddings, strict=True)
+            ],
         },
     )
-    authors = file_metadata.get("authors")
-    if authors:
-        authors_query = """
-        MATCH (p:Paper {id: $paper_id})
-        UNWIND $authors AS author_name
-        MERGE (a:Author {name: author_name})
-        MERGE (a)-[:WROTE]->(p)
-        """
-        graph.query(authors_query, params={"paper_id": paper_id, "authors": authors})
 
-    graph_documents = []
-    chunk_embeddings_list = []
-    skipped_count = 0
+    # The Cypher tool generates queries from this cached schema
+    graph.refresh_schema()
 
-    for i, chunk in enumerate(chunks, 1):
-        try:
-            unique_string = chunk.page_content
-            chunk_id = hashlib.md5(unique_string.encode("utf-8")).hexdigest()
 
-            chunk.metadata["id"] = chunk_id
+DELETE_PAPER_QUERY = """
+MATCH (p:Paper {id: $paper_id})
+OPTIONAL MATCH (chunk:Document)-[:PART_OF]->(p)
+DETACH DELETE chunk, p
+WITH count(*) AS _
+// Entities and authors that are no longer connected to any paper or chunk
+MATCH (n)
+WHERE (n:Author OR n:Method OR n:Dataset OR n:Metric OR n:Task OR n:Concept)
+  AND NOT (n)--(:Paper) AND NOT (n)--(:Document)
+DETACH DELETE n
+"""
 
-            check_query = (
-                "MATCH (d:Document {id: $chunk_id}) RETURN count(d) > 0 AS exists"
-            )
-            res = graph.query(check_query, params={"chunk_id": chunk_id})
 
-            if res and res[0]["exists"]:
-                skipped_count += 1
-                continue
-
-            doc = Document(page_content=chunk.page_content, metadata={"id": chunk_id})
-
-            doc_embedding = embedder.embed_documents([chunk.page_content])[0]
-            chunk_embeddings_list.append({"id": chunk_id, "embedding": doc_embedding})
-
-            # print(f"Chunk text:\n{chunk.page_content[:2000]}")
-            extraction = extract_chunk(chunk.page_content)
-
-            if extraction is None:
-                print("Extractor returned None. Skipping chunk.")
-                continue
-
-            # print(f"Extracted entities: {extraction.entities}")
-            # print(f"Extracted relationships: {extraction.relationships}")
-
-            g_doc = to_graph_document(
-                extraction=extraction,
-                source=doc,
-            )
-            graph_documents.append(g_doc)
-
-        except Exception as e:  # noqa: BLE001
-            print(f"\nError in chunk {i}: {e}. Skipping chunk...")
-
-    if graph_documents:
-        print(f"Uploading {len(graph_documents)} graph blocks to Neo4j...")
-
-        graph.add_graph_documents(graph_documents, include_source=True)
-
-        print("Attaching vector embeddings and linking chunks to the Paper...")
-
-        link_chunks_query = """
-        UNWIND $updates AS row
-        MATCH (d:Document {id: row.id})
-        MATCH (p:Paper {id: $paper_id})
-        SET d.embedding = row.embedding
-        MERGE (d)-[:PART_OF]->(p)
-        """
-
-        graph.query(
-            link_chunks_query,
-            params={"updates": chunk_embeddings_list, "paper_id": paper_id},
-        )
-        print("Graph ingestion and metadata linking complete.")
-        print(f"\nDocument total price: {total_price!s} $")
-    else:
-        print("\nNo entities or relations could be extracted.")
-        raise Exception  # noqa: TRY002
+def delete_paper(graph: Neo4jGraph, paper_id: str) -> None:
+    """Remove a paper, its chunks, and the entities and authors only it had."""
+    graph.query(DELETE_PAPER_QUERY, params={"paper_id": paper_id})
+    graph.refresh_schema()
 
 
 def init_neo4j_schema(graph, embedding_dimension: int = 1024):
     """
-    Inicializa automáticamente restricciones e índices vectoriales en Neo4j
-    al arrancar la aplicación. Es seguro ejecutarlo múltiples veces.
+    Create the Neo4j constraints and vector indexes on application startup.
+    Safe to run multiple times.
     """
     setup_queries = [
-        """
-        CREATE CONSTRAINT unique_node_id IF NOT EXISTS 
-        FOR (n:Entity) REQUIRE n.id IS UNIQUE
-        """,
+        # Uniqueness constraints also create the indexes that MERGE uses
+        "CREATE CONSTRAINT paper_id IF NOT EXISTS FOR (n:Paper) REQUIRE n.id IS UNIQUE",
+        "CREATE CONSTRAINT document_id IF NOT EXISTS FOR (n:Document) REQUIRE n.id IS UNIQUE",
+        "CREATE CONSTRAINT author_name IF NOT EXISTS FOR (n:Author) REQUIRE n.name IS UNIQUE",
         f"""
         CREATE VECTOR INDEX documentVectorIndex IF NOT EXISTS
-        FOR (d:Document) 
+        FOR (d:Document)
         ON (d.embedding)
         OPTIONS {{ indexConfig: {{
           `vector.dimensions`: {embedding_dimension},

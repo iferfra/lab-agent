@@ -1,0 +1,6 @@
+# Only what the API image needs; keeps .env, .venv and node_modules out of the build
+*
+!pyproject.toml
+!uv.lock
+!app
+!src

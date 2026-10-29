@@ -51,7 +51,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(`${API_URL}${path}`, init);
   } catch {
-    throw new ApiError("No se pudo conectar con la API. ¿Está el servidor FastAPI en marcha?");
+    throw new ApiError("Could not reach the API. Is the FastAPI server running?");
   }
   if (!res.ok) throw await parseError(res);
   return res.json() as Promise<T>;
@@ -107,7 +107,7 @@ export function uploadPaper(
         reject(new ApiError(`Error ${xhr.status}: ${detail}`, xhr.status));
       }
     };
-    xhr.onerror = () => reject(new ApiError("No se pudo conectar con la API."));
+    xhr.onerror = () => reject(new ApiError("Could not reach the API."));
     xhr.send(form);
   });
 }

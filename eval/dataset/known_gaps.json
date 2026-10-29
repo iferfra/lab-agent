@@ -1,0 +1,32 @@
+[
+  {
+    "source_id": "gap_001",
+    "topic": "GPU memory used to train the models of either paper",
+    "reason": "Neither paper reports memory usage. The wireframe paper names its GPUs (an A100 for training, a GTX 1070 for inference) but not how much memory was used."
+  },
+  {
+    "source_id": "gap_002",
+    "topic": "Fairness results by age or ethnicity in 'Deconfounding demographic bias estimation in facial expression recognition'",
+    "reason": "The paper only analyzes gender and leaves age and ethnicity as future work."
+  },
+  {
+    "source_id": "gap_003",
+    "topic": "Use of the COCO dataset in 'Deconfounding demographic bias estimation in facial expression recognition'",
+    "reason": "COCO is only used by the wireframe paper."
+  },
+  {
+    "source_id": "gap_004",
+    "topic": "Results of the wireframe model inside a SLAM or 3D reconstruction pipeline",
+    "reason": "SLAM and 3D reconstruction are only mentioned as motivating applications; there are no experiments on them."
+  },
+  {
+    "source_id": "gap_005",
+    "topic": "FLOPs of the model proposed in 'Learning to Detect and Describe a Wireframe'",
+    "reason": "The paper reports inference time and parameter count, but not FLOPs."
+  },
+  {
+    "source_id": "gap_006",
+    "topic": "Use of large language models to reduce gender bias",
+    "reason": "Neither paper uses or discusses language models."
+  }
+]

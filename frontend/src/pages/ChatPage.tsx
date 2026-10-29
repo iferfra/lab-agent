@@ -7,10 +7,10 @@ import { sendChat } from "../lib/api";
 import { newConversation, uid, useConversations, type ChatMessage, type Conversation } from "../lib/conversations";
 
 const SUGGESTIONS = [
-  "¿Qué papers hay indexados y de qué tratan?",
-  "Resume las contribuciones principales de cada paper",
-  "¿Qué métricas y datasets se utilizan en los experimentos?",
-  "¿Qué autores han colaborado entre sí?",
+  "Which papers are indexed and what are they about?",
+  "Summarize the main contributions of each paper",
+  "Which metrics and datasets are used in the experiments?",
+  "Which authors have worked together?",
 ];
 
 function formatTitle(text: string) {
@@ -30,7 +30,7 @@ function ThinkingIndicator() {
           />
         ))}
       </div>
-      Consultando el grafo de conocimiento…
+      Querying the knowledge graph…
     </div>
   );
 }
@@ -65,7 +65,7 @@ function MessageRow({ msg, onRetry }: { msg: ChatMessage; onRetry?: () => void }
             <p>{msg.content}</p>
             {onRetry && (
               <button onClick={onRetry} className="mt-2 inline-flex items-center gap-1.5 font-medium hover:underline">
-                <RotateCcw className="h-3.5 w-3.5" /> Reintentar
+                <RotateCcw className="h-3.5 w-3.5" /> Retry
               </button>
             )}
           </div>
@@ -151,7 +151,7 @@ export default function ChatPage() {
       reply = {
         id: uid(),
         role: "assistant",
-        content: res.response || "_El agente no devolvió respuesta._",
+        content: res.response || "_The agent returned no answer._",
         createdAt: Date.now(),
         durationMs: performance.now() - start,
       };
@@ -160,7 +160,7 @@ export default function ChatPage() {
       reply = {
         id: uid(),
         role: "assistant",
-        content: aborted ? "Consulta cancelada." : (e as Error).message,
+        content: aborted ? "Query cancelled." : (e as Error).message,
         error: true,
         createdAt: Date.now(),
       };
@@ -210,11 +210,11 @@ export default function ChatPage() {
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 dark:border-slate-800 lg:flex">
         <div className="p-3">
           <button onClick={startNew} className="btn-outline w-full">
-            <Plus className="h-4 w-4" /> Nueva conversación
+            <Plus className="h-4 w-4" /> New conversation
           </button>
         </div>
         <div className="scrollbar-thin flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
-          <div className="px-2 pb-1 pt-2 text-xs font-medium uppercase tracking-wider text-slate-400">Historial</div>
+          <div className="px-2 pb-1 pt-2 text-xs font-medium uppercase tracking-wider text-slate-400">History</div>
           {sorted.map((c) => (
             <div
               key={c.id}
@@ -234,7 +234,7 @@ export default function ChatPage() {
                   remove(c.id);
                 }}
                 className="rounded p-1 text-slate-400 opacity-0 hover:text-red-500 group-hover:opacity-100"
-                aria-label="Eliminar conversación"
+                aria-label="Delete conversation"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -247,7 +247,7 @@ export default function ChatPage() {
       <section className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3 dark:border-slate-800">
           <h1 className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{active.title}</h1>
-          <button onClick={startNew} className="btn-ghost px-2.5 py-1.5 lg:hidden" aria-label="Nueva conversación">
+          <button onClick={startNew} className="btn-ghost px-2.5 py-1.5 lg:hidden" aria-label="New conversation">
             <Plus className="h-4 w-4" />
           </button>
         </div>
@@ -258,10 +258,10 @@ export default function ChatPage() {
               <div className="mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-lg shadow-brand-600/30">
                 <Sparkles className="h-7 w-7" />
               </div>
-              <h2 className="text-2xl font-semibold tracking-tight">¿Qué quieres saber de tus papers?</h2>
+              <h2 className="text-2xl font-semibold tracking-tight">What would you like to know about your papers?</h2>
               <p className="mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
-                Asistente académico sobre un grafo de conocimiento en Neo4j. Pregunta por papers, autores, métodos,
-                datasets o métricas.
+                Research assistant over a Neo4j knowledge graph. Ask about papers, authors, methods, datasets
+                or metrics.
               </p>
               <div className="mt-8 grid w-full gap-2.5 sm:grid-cols-2">
                 {SUGGESTIONS.map((s) => (
@@ -310,7 +310,7 @@ export default function ChatPage() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
               rows={1}
-              placeholder="Escribe tu pregunta…"
+              placeholder="Ask a question…"
               className="max-h-[200px] flex-1 resize-none bg-transparent px-3 py-2 text-[15px] outline-none placeholder:text-slate-400"
             />
             {loading ? (
@@ -318,7 +318,7 @@ export default function ChatPage() {
                 type="button"
                 onClick={() => abortRef.current?.abort()}
                 className="grid h-10 w-10 place-items-center rounded-xl bg-slate-800 text-white hover:bg-slate-700 dark:bg-slate-700"
-                aria-label="Cancelar"
+                aria-label="Cancel"
               >
                 <Square className="h-4 w-4 fill-current" />
               </button>
@@ -327,14 +327,14 @@ export default function ChatPage() {
                 type="submit"
                 disabled={!input.trim() || !!pendingId}
                 className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-white transition hover:bg-brand-700 disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-slate-800"
-                aria-label="Enviar"
+                aria-label="Send"
               >
                 <ArrowUp className="h-5 w-5" />
               </button>
             )}
           </form>
           <p className="mt-2 text-center text-xs text-slate-400">
-            Enter para enviar · Shift + Enter para nueva línea
+            Enter to send · Shift + Enter for a new line
           </p>
         </div>
       </section>

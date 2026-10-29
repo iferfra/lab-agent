@@ -21,7 +21,7 @@ const STORAGE_KEY = "lab-agent:conversations";
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
 export function newConversation(): Conversation {
-  return { id: uid(), title: "Nueva conversación", messages: [], updatedAt: Date.now() };
+  return { id: uid(), title: "New conversation", messages: [], updatedAt: Date.now() };
 }
 
 function load(): Conversation[] {

@@ -21,10 +21,10 @@ export function CopyButton({ getText, className }: { getText: () => string; clas
         }
       }}
       className={className}
-      aria-label="Copiar"
+      aria-label="Copy"
     >
       {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-      <span>{copied ? "Copiado" : "Copiar"}</span>
+      <span>{copied ? "Copied" : "Copy"}</span>
     </button>
   );
 }
@@ -33,7 +33,7 @@ function CodeBlock({ children, ...props }: ComponentPropsWithoutRef<"pre">) {
   const ref = useRef<HTMLPreElement>(null);
   const child = Array.isArray(children) ? children[0] : children;
   const className: string = (child as any)?.props?.className ?? "";
-  const lang = /language-(\w+)/.exec(className)?.[1] ?? "código";
+  const lang = /language-(\w+)/.exec(className)?.[1] ?? "code";
 
   return (
     <div className="not-prose my-4 overflow-hidden rounded-xl border border-slate-800 bg-[#0d1117] text-[13px]">

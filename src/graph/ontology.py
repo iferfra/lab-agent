@@ -1,16 +1,23 @@
-ALLOWED_NODES = [
-    "Concept",  # Concept, emchanism or scientific theory identificable
-    "Method",  # Model, algorythm, architecture or techical method identificable.
-    "Dataset",  # Data collection identifibale by a concrete name
-    "Metric",  # Quantitative measure of identificable evaluation
-    "Benchmark",  # Evaluation suite or protocol identificable
-    "Task",  # Concrete scientific problem
-]
+"""Schema of the knowledge graph.
 
-ALLOWED_RELATIONSHIPS = [
-    "ADDRESSES_TASK",  # Method -> Task
-    "TRAINED_ON",  # Method -> Dataset
-    "EVALUATED_ON",  # Method -> Dataset / Benchmark
-    "USES_METHOD",  # Method -> Method
-    "INSTANCE_OF",  # Method/Concept -> Concept
-]
+(Author)-[:WROTE]->(Paper)<-[:PART_OF]-(Document)-[:MENTIONS]->(entity)
+
+(Paper)-[:PROPOSES]->(Method)       its own contribution
+(Paper)-[:BUILDS_ON]->(Method)      existing methods it reuses
+(Paper)-[:COMPARES_WITH]->(Method)  baselines in its experiments
+(Paper)-[:ADDRESSES]->(Task)
+(Paper)-[:USES_DATASET]->(Dataset)
+(Paper)-[:MEASURES_WITH]->(Metric)
+(Paper)-[:STUDIES]->(Concept)
+"""
+
+# Field of PaperExtraction -> (relationship from the Paper, label of the entity)
+PAPER_RELATIONSHIPS = {
+    "proposed_methods": ("PROPOSES", "Method"),
+    "base_methods": ("BUILDS_ON", "Method"),
+    "baseline_methods": ("COMPARES_WITH", "Method"),
+    "tasks": ("ADDRESSES", "Task"),
+    "datasets": ("USES_DATASET", "Dataset"),
+    "metrics": ("MEASURES_WITH", "Metric"),
+    "concepts": ("STUDIES", "Concept"),
+}

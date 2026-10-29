@@ -33,12 +33,12 @@ function Stat({ icon: Icon, label, value }: { icon: typeof BookOpen; label: stri
 }
 
 function Authors({ authors, max = 4 }: { authors: string[]; max?: number }) {
-  if (!authors.length) return <span className="text-slate-400">Autores desconocidos</span>;
+  if (!authors.length) return <span className="text-slate-400">Unknown authors</span>;
   const shown = authors.slice(0, max);
   return (
     <span>
       {shown.join(", ")}
-      {authors.length > max && <span className="text-slate-400"> +{authors.length - max} más</span>}
+      {authors.length > max && <span className="text-slate-400"> +{authors.length - max} more</span>}
     </span>
   );
 }
@@ -95,32 +95,32 @@ export default function DocumentsPage() {
   }, [docs]);
 
   const askAbout = (d: IndexedDocument) =>
-    navigate("/chat", { state: { prefill: `Resume el paper "${d.title}": objetivo, método y resultados principales.` } });
+    navigate("/chat", { state: { prefill: `Summarize the paper "${d.title}": goal, method and main results.` } });
 
   return (
     <div className="scrollbar-thin h-full overflow-y-auto">
       <div className="mx-auto max-w-6xl px-5 py-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Documentos indexados</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Indexed documents</h1>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Papers presentes en el grafo de conocimiento de Neo4j.
+              Papers stored in the Neo4j knowledge graph.
             </p>
           </div>
           <div className="flex gap-2">
             <button onClick={load} disabled={loading} className="btn-outline">
-              <RefreshCw className={clsx("h-4 w-4", loading && "animate-spin")} /> Actualizar
+              <RefreshCw className={clsx("h-4 w-4", loading && "animate-spin")} /> Refresh
             </button>
             <Link to="/upload" className="btn-primary">
-              <FileUp className="h-4 w-4" /> Subir paper
+              <FileUp className="h-4 w-4" /> Upload paper
             </Link>
           </div>
         </div>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
           <Stat icon={BookOpen} label="Papers" value={docs?.length ?? "—"} />
-          <Stat icon={Users} label="Autores únicos" value={docs ? stats.authors : "—"} />
-          <Stat icon={CalendarDays} label="Rango de años" value={docs ? stats.range : "—"} />
+          <Stat icon={Users} label="Unique authors" value={docs ? stats.authors : "—"} />
+          <Stat icon={CalendarDays} label="Year range" value={docs ? stats.range : "—"} />
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
@@ -129,16 +129,16 @@ export default function DocumentsPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por título, autor, venue o año…"
+              placeholder="Search by title, author, venue or year…"
               className="input pl-9"
             />
           </div>
           <div className="relative">
             <ArrowDownUp className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="input w-auto pl-9 pr-8">
-              <option value="title">Título (A–Z)</option>
-              <option value="year-desc">Más recientes</option>
-              <option value="year-asc">Más antiguos</option>
+              <option value="title">Title (A–Z)</option>
+              <option value="year-desc">Newest first</option>
+              <option value="year-asc">Oldest first</option>
             </select>
           </div>
           <div className="flex rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
@@ -152,7 +152,7 @@ export default function DocumentsPage() {
                     "rounded-lg p-1.5",
                     view === v ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white" : "text-slate-400",
                   )}
-                  aria-label={v === "grid" ? "Vista cuadrícula" : "Vista lista"}
+                  aria-label={v === "grid" ? "Grid view" : "List view"}
                 >
                   <Icon className="h-4 w-4" />
                 </button>
@@ -165,7 +165,7 @@ export default function DocumentsPage() {
           <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
-              <p className="font-medium">No se pudieron cargar los documentos</p>
+              <p className="font-medium">Could not load the documents</p>
               <p className="mt-0.5 opacity-80">{error}</p>
             </div>
           </div>
@@ -182,10 +182,10 @@ export default function DocumentsPage() {
         {docs && filtered.length === 0 && (
           <div className="card mt-6 flex flex-col items-center px-6 py-14 text-center">
             <BookOpen className="h-10 w-10 text-slate-300 dark:text-slate-600" />
-            <p className="mt-3 font-medium">{docs.length ? "Ningún paper coincide con la búsqueda" : "Aún no hay papers indexados"}</p>
+            <p className="mt-3 font-medium">{docs.length ? "No paper matches your search" : "No papers indexed yet"}</p>
             {!docs.length && (
               <Link to="/upload" className="btn-primary mt-4">
-                <FileUp className="h-4 w-4" /> Subir el primero
+                <FileUp className="h-4 w-4" /> Upload the first one
               </Link>
             )}
           </div>
@@ -210,7 +210,7 @@ export default function DocumentsPage() {
                     </span>
                   )}
                 </div>
-                <h2 className="mt-3 font-semibold leading-snug">{d.title ?? "Sin título"}</h2>
+                <h2 className="mt-3 font-semibold leading-snug">{d.title ?? "Untitled"}</h2>
                 <p className="mt-2 flex items-start gap-1.5 text-sm text-slate-500 dark:text-slate-400">
                   <Users className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   <Authors authors={d.authors ?? []} />
@@ -221,7 +221,7 @@ export default function DocumentsPage() {
                     onClick={() => askAbout(d)}
                     className="btn-ghost px-2.5 py-1.5 text-xs text-brand-600 dark:text-brand-400"
                   >
-                    <MessageSquare className="h-3.5 w-3.5" /> Preguntar
+                    <MessageSquare className="h-3.5 w-3.5" /> Ask
                   </button>
                 </div>
               </article>
@@ -234,24 +234,24 @@ export default function DocumentsPage() {
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 dark:border-slate-800">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Título</th>
-                  <th className="px-4 py-3 font-medium">Autores</th>
+                  <th className="px-4 py-3 font-medium">Title</th>
+                  <th className="px-4 py-3 font-medium">Authors</th>
                   <th className="px-4 py-3 font-medium">Venue</th>
-                  <th className="px-4 py-3 font-medium">Año</th>
+                  <th className="px-4 py-3 font-medium">Year</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filtered.map((d, i) => (
                   <tr key={d.id ?? i} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="max-w-md px-4 py-3 font-medium">{d.title ?? "Sin título"}</td>
+                    <td className="max-w-md px-4 py-3 font-medium">{d.title ?? "Untitled"}</td>
                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
                       <Authors authors={d.authors ?? []} max={2} />
                     </td>
                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{d.venue ?? "—"}</td>
                     <td className="px-4 py-3 tabular-nums text-slate-500 dark:text-slate-400">{d.year ?? "—"}</td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={() => askAbout(d)} className="btn-ghost p-1.5" aria-label="Preguntar">
+                      <button onClick={() => askAbout(d)} className="btn-ghost p-1.5" aria-label="Ask about this paper">
                         <MessageSquare className="h-4 w-4" />
                       </button>
                     </td>

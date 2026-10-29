@@ -25,21 +25,6 @@ async def calculate_file_hash(file: UploadFile) -> str:
     return sha256.hexdigest()
 
 
-async def is_new_pdf(file: UploadFile, upload_dir: Path) -> bool:
-    sha256 = hashlib.sha256()
-
-    await file.seek(0)
-    while chunk := await file.read(64 * 1024):
-        sha256.update(chunk)
-
-    await file.seek(0)
-
-    file_hash = sha256.hexdigest()
-    file_path = upload_dir / "pdf" / f"{file_hash}.pdf"
-
-    return not file_path.is_file()
-
-
 async def validate_pdf(file: UploadFile) -> bool:
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
@@ -83,7 +68,8 @@ async def upload_ingest_paper(
         file_hash = await calculate_file_hash(file)
         file_path = UPLOAD_DIR / "pdf" / f"{file_hash}.pdf"
 
-        if await is_new_pdf(file, UPLOAD_DIR):
+        # The same PDF always has the same hash, so it is only indexed once
+        if not file_path.is_file():
             file_path.parent.mkdir(exist_ok=True, parents=True)
 
             async with aiofiles.open(file_path, "wb") as buffer:
@@ -94,6 +80,7 @@ async def upload_ingest_paper(
             md_path.parent.mkdir(exist_ok=True, parents=True)
 
             file_metadata = {
+                "paper_id": file_hash,
                 "file_name": file.filename,
                 "file_path": file_path,
                 "md_path": md_path,

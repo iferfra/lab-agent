@@ -1,26 +1,20 @@
-ALLOWED_ENDPOINTS = {
-    "ADDRESSES_TASK": {("Method", "Task")},
-    "TRAINED_ON": {("Method", "Dataset")},
-    "EVALUATED_ON": {
-        ("Method", "Dataset"),
-        ("Method", "Benchmark"),
-    },
-    "USES_METHOD": {("Method", "Method")},
-    "INSTANCE_OF": {
-        ("Method", "Concept"),
-        ("Concept", "Concept"),
-    },
-}
+import re
+
+
+def normalize_text(text: str) -> str:
+    """Ignore Markdown emphasis and whitespace, which the LLM rarely copies."""
+    return " ".join(text.replace("*", "").replace("_", "").split())
 
 
 def validate_evidence(evidence: str, chunk_text: str) -> bool:
-    return bool(evidence.strip()) and evidence.strip() in chunk_text
+    evidence = normalize_text(evidence)
+    return bool(evidence) and evidence in normalize_text(chunk_text)
 
 
-def validate_relationship_types(
-    source_type: str,
-    relationship_type: str,
-    target_type: str,
-) -> bool:
-    allowed_pairs = ALLOWED_ENDPOINTS.get(relationship_type, set())
-    return (source_type, target_type) in allowed_pairs
+def appears_in(name: str, text: str) -> bool:
+    return normalize_text(name).lower() in normalize_text(text).lower()
+
+
+def is_specific_name(name: str) -> bool:
+    """Reject math symbols and variables such as "d", "θ_1" or "x^b"."""
+    return len(re.findall(r"[A-Za-z]", name)) >= 3

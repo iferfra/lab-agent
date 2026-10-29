@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 const NAV = [
-  { to: "/chat", label: "Chat", icon: MessageSquare, hint: "Pregunta al grafo" },
-  { to: "/documents", label: "Documentos", icon: Library, hint: "Papers indexados" },
-  { to: "/upload", label: "Subir paper", icon: FileUp, hint: "Ingesta de PDFs" },
+  { to: "/chat", label: "Chat", icon: MessageSquare, hint: "Ask the graph" },
+  { to: "/documents", label: "Documents", icon: Library, hint: "Indexed papers" },
+  { to: "/upload", label: "Upload paper", icon: FileUp, hint: "PDF ingestion" },
 ];
 
 function useTheme() {
@@ -80,11 +80,11 @@ export default function Layout() {
         ))}
       </nav>
       <div className="mt-auto flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-        <span>Tema {dark ? "oscuro" : "claro"}</span>
+        <span>{dark ? "Dark" : "Light"} theme</span>
         <button
           onClick={() => setDark(!dark)}
           className="rounded-lg p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800"
-          aria-label="Cambiar tema"
+          aria-label="Toggle theme"
         >
           {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
@@ -112,7 +112,7 @@ export default function Layout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 md:hidden">
-          <button className="btn-ghost p-2" onClick={() => setMobileOpen(true)} aria-label="Abrir menú">
+          <button className="btn-ghost p-2" onClick={() => setMobileOpen(true)} aria-label="Open menu">
             <Menu className="h-5 w-5" />
           </button>
           <Logo />

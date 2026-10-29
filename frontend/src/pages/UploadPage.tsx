@@ -21,14 +21,14 @@ import {
 const MAX_MB = 50;
 
 const STATUS_STYLE: Record<IngestionState, { label: string; icon: typeof Clock; cls: string }> = {
-  pending: { label: "En cola", icon: Clock, cls: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300" },
+  pending: { label: "Queued", icon: Clock, cls: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300" },
   processing: {
-    label: "Procesando",
+    label: "Processing",
     icon: Loader2,
     cls: "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300",
   },
   completed: {
-    label: "Indexado",
+    label: "Indexed",
     icon: CheckCircle2,
     cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
   },
@@ -69,7 +69,7 @@ function AuthorsInput({ value, onChange }: { value: string[]; onChange: (v: stri
             type="button"
             onClick={() => onChange(value.filter((x) => x !== a))}
             className="rounded p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-            aria-label={`Quitar ${a}`}
+            aria-label={`Remove ${a}`}
           >
             <X className="h-3 w-3" />
           </button>
@@ -80,7 +80,7 @@ function AuthorsInput({ value, onChange }: { value: string[]; onChange: (v: stri
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={onKeyDown}
         onBlur={commit}
-        placeholder={value.length ? "" : "Escribe un nombre y pulsa Enter"}
+        placeholder={value.length ? "" : "Type a name and press Enter"}
         className="min-w-[160px] flex-1 bg-transparent py-0.5 outline-none placeholder:text-slate-400"
       />
     </div>
@@ -124,11 +124,11 @@ export default function UploadPage() {
     setNotice(null);
     if (!f) return;
     if (!f.name.toLowerCase().endsWith(".pdf") || (f.type && f.type !== "application/pdf")) {
-      setFileError("Solo se admiten archivos PDF.");
+      setFileError("Only PDF files are accepted.");
       return;
     }
     if (f.size > MAX_MB * 1024 * 1024) {
-      setFileError(`El archivo supera ${MAX_MB} MB.`);
+      setFileError(`The file is larger than ${MAX_MB} MB.`);
       return;
     }
     setFile(f);
@@ -183,8 +183,8 @@ export default function UploadPage() {
       const duplicate = after === undefined || (after === before && (after === "completed" || after === "failed"));
       setNotice(
         duplicate
-          ? `"${name}" ya estaba en el sistema (mismo contenido), no se ha vuelto a indexar.`
-          : `"${name}" se ha enviado a la cola de ingesta.`,
+          ? `"${name}" is already in the system (same content), so it was not indexed again.`
+          : `"${name}" was added to the ingestion queue.`,
       );
       reset();
     } catch (err) {
@@ -207,9 +207,9 @@ export default function UploadPage() {
       <div className="mx-auto grid max-w-6xl gap-6 px-5 py-8 lg:grid-cols-[1fr_320px]">
         <form onSubmit={onSubmit} className="space-y-6">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Subir paper</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Upload paper</h1>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Arrastra un PDF y completa sus metadatos. Los campos vacíos se extraerán automáticamente del documento.
+              Drop a PDF and fill in its metadata. Empty fields are extracted from the document automatically.
             </p>
           </div>
 
@@ -245,10 +245,10 @@ export default function UploadPage() {
               >
                 <UploadCloud className="h-7 w-7" />
               </div>
-              <p className="mt-4 font-medium">{dragging ? "Suelta el PDF aquí" : "Arrastra tu paper aquí"}</p>
+              <p className="mt-4 font-medium">{dragging ? "Drop the PDF here" : "Drag your paper here"}</p>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                o <span className="font-medium text-brand-600 dark:text-brand-400">haz clic para seleccionarlo</span> · PDF
-                hasta {MAX_MB} MB
+                or <span className="font-medium text-brand-600 dark:text-brand-400">click to select it</span> · PDF
+                up to {MAX_MB} MB
               </p>
             </div>
           ) : (
@@ -266,7 +266,7 @@ export default function UploadPage() {
                 )}
               </div>
               {!uploading && (
-                <button type="button" onClick={() => setFile(null)} className="btn-ghost p-2" aria-label="Quitar archivo">
+                <button type="button" onClick={() => setFile(null)} className="btn-ghost p-2" aria-label="Remove file">
                   <X className="h-4 w-4" />
                 </button>
               )}
@@ -288,17 +288,17 @@ export default function UploadPage() {
           {/* Metadata */}
           <fieldset disabled={uploading} className="card space-y-5 p-6">
             <div className="flex items-baseline justify-between">
-              <h2 className="font-semibold">Metadatos</h2>
-              <span className="text-xs text-slate-400">Todos opcionales</span>
+              <h2 className="font-semibold">Metadata</h2>
+              <span className="text-xs text-slate-400">All optional</span>
             </div>
 
             <div>
-              <label className="label" htmlFor="title">Título</label>
-              <input id="title" className="input" value={form.paper_title} onChange={set("paper_title")} placeholder="Título del paper" />
+              <label className="label" htmlFor="title">Title</label>
+              <input id="title" className="input" value={form.paper_title} onChange={set("paper_title")} placeholder="Paper title" />
             </div>
 
             <div>
-              <label className="label">Autores</label>
+              <label className="label">Authors</label>
               <AuthorsInput value={authors} onChange={setAuthors} />
             </div>
 
@@ -312,7 +312,7 @@ export default function UploadPage() {
                 <input id="doi" className="input" value={form.doi} onChange={set("doi")} placeholder="10.1109/…" />
               </div>
               <div>
-                <label className="label" htmlFor="year">Año</label>
+                <label className="label" htmlFor="year">Year</label>
                 <input
                   id="year"
                   type="number"
@@ -327,7 +327,7 @@ export default function UploadPage() {
             </div>
 
             <div>
-              <label className="label" htmlFor="repo">Repositorio</label>
+              <label className="label" htmlFor="repo">Repository</label>
               <input
                 id="repo"
                 type="url"
@@ -346,7 +346,7 @@ export default function UploadPage() {
                 className="input resize-y"
                 value={form.abstract}
                 onChange={set("abstract")}
-                placeholder="Pega aquí el abstract del paper"
+                placeholder="Paste the paper abstract here"
               />
             </div>
           </fieldset>
@@ -364,17 +364,17 @@ export default function UploadPage() {
 
           <div className="flex justify-end gap-2">
             <button type="button" onClick={reset} disabled={uploading} className="btn-ghost">
-              Limpiar
+              Clear
             </button>
             <button type="submit" disabled={!file || uploading} className="btn-primary px-5">
               {uploading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {progress! < 1 ? `Subiendo ${Math.round(progress! * 100)}%` : "Encolando…"}
+                  {progress! < 1 ? `Uploading ${Math.round(progress! * 100)}%` : "Queuing…"}
                 </>
               ) : (
                 <>
-                  <UploadCloud className="h-4 w-4" /> Subir e indexar
+                  <UploadCloud className="h-4 w-4" /> Upload and index
                 </>
               )}
             </button>
@@ -385,14 +385,14 @@ export default function UploadPage() {
         <aside className="lg:pt-[80px]">
           <div className="card p-5 lg:sticky lg:top-6">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold">Estado de ingesta</h2>
+              <h2 className="font-semibold">Ingestion status</h2>
               {hasActive && <Loader2 className="h-4 w-4 animate-spin text-brand-500" />}
             </div>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Conversión a Markdown, extracción y carga en el grafo.
+              Markdown conversion, extraction and graph loading.
             </p>
             {entries.length === 0 ? (
-              <p className="mt-6 text-center text-sm text-slate-400">Sin ingestas en esta sesión del servidor.</p>
+              <p className="mt-6 text-center text-sm text-slate-400">No ingestions since the server started.</p>
             ) : (
               <ul className="mt-4 space-y-2">
                 {entries.map(([name, s]) => {
