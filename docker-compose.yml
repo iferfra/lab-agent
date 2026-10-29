@@ -1,40 +1,14 @@
 services:
-  neo4j:
-    image: neo4j:5.26-community
-    container_name: lab_neo4j
-    ports:
-      - "7474:7474" # Neo4j Browser, to explore the graph
-      - "7687:7687" # Bolt, for the API and the evaluation scripts
-    environment:
-      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}
-      # add_graph_documents uses APOC procedures
-      - NEO4J_PLUGINS=["apoc"]
-    volumes:
-      - neo4j_data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH#neo4j/}\" 'RETURN 1'"]
-      interval: 5s
-      timeout: 10s
-      retries: 30
-
   api:
     build:
       context: .
       dockerfile: ./app/Dockerfile
     container_name: lab_api
-    depends_on:
-      neo4j:
-        condition: service_healthy
     ports:
       - "8000:8000"
     env_file:
       - .env
     environment:
-      # Use the Neo4j container above. Remove these three lines to use an
-      # external instance (e.g. Neo4j Aura) configured in .env instead.
-      - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USERNAME=neo4j
-      - NEO4J_DATABASE=neo4j
       # Store uploaded papers in the volume so they survive container rebuilds
       - DATA_DIR=/data/
     volumes:
@@ -53,5 +27,4 @@ services:
       - API_UPSTREAM=http://api:8000
 
 volumes:
-  neo4j_data:
   lab_data:
