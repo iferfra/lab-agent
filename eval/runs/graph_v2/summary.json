@@ -1,0 +1,59 @@
+{
+  "overall": {
+    "questions": 17,
+    "fact_recall": 0.75,
+    "faithfulness": 0.868,
+    "abstention": 1.0,
+    "context_recall": 0.0,
+    "source_accuracy": 0.294,
+    "errors": 0,
+    "latency_s_median": 9.9,
+    "tokens_mean": 12495
+  },
+  "by_category": {
+    "graph": {
+      "questions": 5,
+      "fact_recall": 0.95,
+      "faithfulness": 1.0,
+      "abstention": null,
+      "context_recall": null,
+      "source_accuracy": 1.0,
+      "errors": 0,
+      "latency_s_median": 2.7,
+      "tokens_mean": 4562
+    },
+    "hybrid": {
+      "questions": 2,
+      "fact_recall": 0.5,
+      "faithfulness": 0.709,
+      "abstention": null,
+      "context_recall": 0.0,
+      "source_accuracy": 0.0,
+      "errors": 0,
+      "latency_s_median": 12.4,
+      "tokens_mean": 16578
+    },
+    "semantic": {
+      "questions": 6,
+      "fact_recall": 0.667,
+      "faithfulness": 0.917,
+      "abstention": null,
+      "context_recall": 0.0,
+      "source_accuracy": 0.0,
+      "errors": 0,
+      "latency_s_median": 10.3,
+      "tokens_mean": 15366
+    },
+    "unanswerable": {
+      "questions": 4,
+      "fact_recall": null,
+      "faithfulness": 0.708,
+      "abstention": 1.0,
+      "context_recall": null,
+      "source_accuracy": 0.0,
+      "errors": 0,
+      "latency_s_median": 10.6,
+      "tokens_mean": 16062
+    }
+  }
+}

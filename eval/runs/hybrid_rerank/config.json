@@ -1,0 +1,12 @@
+{
+  "variant": "hybrid",
+  "tools": [
+    "search_knowledge_graph",
+    "find_paper_entities",
+    "search_chunks_semantically"
+  ],
+  "agent_model": "us.amazon.nova-2-lite-v1:0",
+  "questions": 17,
+  "git_commit": "f3fa91b",
+  "started_at": "2026-10-29T12:14:18+00:00"
+}

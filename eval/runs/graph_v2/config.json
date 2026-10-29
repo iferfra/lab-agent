@@ -1,0 +1,11 @@
+{
+  "variant": "graph",
+  "tools": [
+    "search_knowledge_graph",
+    "find_paper_entities"
+  ],
+  "agent_model": "us.amazon.nova-2-lite-v1:0",
+  "questions": 17,
+  "git_commit": "2b88c2e",
+  "started_at": "2026-10-29T11:53:05+00:00"
+}

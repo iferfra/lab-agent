@@ -1,0 +1,10 @@
+{
+  "variant": "vector",
+  "tools": [
+    "search_chunks_semantically"
+  ],
+  "agent_model": "us.amazon.nova-2-lite-v1:0",
+  "questions": 17,
+  "git_commit": "2b88c2e",
+  "started_at": "2026-10-29T11:51:00+00:00"
+}
