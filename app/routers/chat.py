@@ -15,7 +15,8 @@ async def chat(request: Request, body: ChatRequest):
         }
     }
 
-    result = agent.invoke({"messages": body.query}, config=config)
+    # ainvoke keeps the server responsive while the agent works
+    result = await agent.ainvoke({"messages": body.query}, config=config)
 
     return {
         "query": body.query,

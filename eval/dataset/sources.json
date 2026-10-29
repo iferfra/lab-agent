@@ -1,0 +1,234 @@
+{
+  "graph_facts": [
+    {
+      "source_id": "graph_4e4fc1_authors",
+      "fact": "The authors of 'Deconfounding demographic bias estimation in facial expression recognition' are Iván Ferre, José M. Buenaposada, Luis Baumela and Roberto Valle.",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition"
+    },
+    {
+      "source_id": "graph_4e4fc1_venue",
+      "fact": "'Deconfounding demographic bias estimation in facial expression recognition' was published at CVPR Workshop.",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition"
+    },
+    {
+      "source_id": "graph_4e4fc1_code",
+      "fact": "The code of 'Deconfounding demographic bias estimation in facial expression recognition' is at https://github.com/pcr-upm/cvprw26_recognition.",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition"
+    },
+    {
+      "source_id": "graph_4e4fc1_proposes",
+      "fact": "'Deconfounding demographic bias estimation in facial expression recognition' proposes confounder-standardized evaluation protocol.",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition"
+    },
+    {
+      "source_id": "graph_4e4fc1_builds_on",
+      "fact": "The method of 'Deconfounding demographic bias estimation in facial expression recognition' builds on BiSeNet, FairFace, MediaPipe Face Mesh and ResNet-50.",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition"
+    },
+    {
+      "source_id": "graph_4e4fc1_addresses",
+      "fact": "'Deconfounding demographic bias estimation in facial expression recognition' addresses Facial Expression Recognition and demographic bias estimation.",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition"
+    },
+    {
+      "source_id": "graph_4e4fc1_uses_dataset",
+      "fact": "'Deconfounding demographic bias estimation in facial expression recognition' uses the datasets Aff-Wild2, AffectNet+, Multi-PIE and RAF-DB.",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition"
+    },
+    {
+      "source_id": "graph_4e4fc1_measures_with",
+      "fact": "'Deconfounding demographic bias estimation in facial expression recognition' reports the metrics class-wise true positive rate, empirical fairness gap, macro-averaged true positive rate and standardized fairness gap.",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition"
+    },
+    {
+      "source_id": "graph_4e4fc1_studies",
+      "fact": "'Deconfounding demographic bias estimation in facial expression recognition' studies confounder standardization, dataset composition, demographic bias, head pose, illumination, subgroup imbalance and visual confounding factors.",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition"
+    },
+    {
+      "source_id": "graph_a8b0b6_authors",
+      "fact": "The authors of 'Learning to Detect and Describe a Wireframe' are Iago Suárez, Iván Ferre and Luis Baumela.",
+      "paper": "Learning to Detect and Describe a Wireframe"
+    },
+    {
+      "source_id": "graph_a8b0b6_code",
+      "fact": "The code of 'Learning to Detect and Describe a Wireframe' is at https://github.com/iferfra/wireframe-detector.",
+      "paper": "Learning to Detect and Describe a Wireframe"
+    },
+    {
+      "source_id": "graph_a8b0b6_proposes",
+      "fact": "'Learning to Detect and Describe a Wireframe' proposes Multitask Wireframe Detector.",
+      "paper": "Learning to Detect and Describe a Wireframe"
+    },
+    {
+      "source_id": "graph_a8b0b6_builds_on",
+      "fact": "The method of 'Learning to Detect and Describe a Wireframe' builds on DISK and HAWP.",
+      "paper": "Learning to Detect and Describe a Wireframe"
+    },
+    {
+      "source_id": "graph_a8b0b6_compares_with",
+      "fact": "'Learning to Detect and Describe a Wireframe' compares its method with ALIKED, DISK, GlueStick, HAWP, LSD, LoFTR, RoMa, SIFT and SuperPoint.",
+      "paper": "Learning to Detect and Describe a Wireframe"
+    },
+    {
+      "source_id": "graph_a8b0b6_addresses",
+      "fact": "'Learning to Detect and Describe a Wireframe' addresses Image matching, Keypoint detection and Line segment detection.",
+      "paper": "Learning to Detect and Describe a Wireframe"
+    },
+    {
+      "source_id": "graph_a8b0b6_uses_dataset",
+      "fact": "'Learning to Detect and Describe a Wireframe' uses the datasets COCO, HPatches and Wireframe Dataset.",
+      "paper": "Learning to Detect and Describe a Wireframe"
+    },
+    {
+      "source_id": "graph_a8b0b6_measures_with",
+      "fact": "'Learning to Detect and Describe a Wireframe' reports the metrics Correct Matches, F1 score at N pixels, Inference time, Mean Average Precision, Mean Structural Average Precision, Parameter count and Repeatability.",
+      "paper": "Learning to Detect and Describe a Wireframe"
+    },
+    {
+      "source_id": "graph_a8b0b6_studies",
+      "fact": "'Learning to Detect and Describe a Wireframe' studies Dynamic Weight Averaging, Encoder-decoder architecture, Holistic Attraction Field Map, Homographic adaptation, Line of Interest pooling, Multitask distillation, Non-maxima suppression, Shared encoder and Wireframe representation.",
+      "paper": "Learning to Detect and Describe a Wireframe"
+    },
+    {
+      "source_id": "graph_shared_1",
+      "fact": "Iván Ferre is an author of both 'Deconfounding demographic bias estimation in facial expression recognition' and 'Learning to Detect and Describe a Wireframe'.",
+      "paper": null
+    },
+    {
+      "source_id": "graph_shared_2",
+      "fact": "Luis Baumela is an author of both 'Deconfounding demographic bias estimation in facial expression recognition' and 'Learning to Detect and Describe a Wireframe'.",
+      "paper": null
+    }
+  ],
+  "chunks": [
+    {
+      "source_id": "76346ec55e656b4002f51b449b00bb6d",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition",
+      "section": "1. Introduction",
+      "text": "We validate this approach in both controlled and in-thewild settings. In Multi-PIE, we design a controlled experiment to show that fairness gaps can change significantly without modifying the model or its predictions, solely due to differences in visual condition distributions. We then analyze three in-the-wild FER datasets: Aff-Wild2, RAF-DB and AffectNet+. Our results show that the impact of visual confounders is dataset-dependent. It is more pronounced in Aff-Wild2, especially for head pose, and less marked in AffectNet+ and RAF-DB, where visual factor distributions per demographic subgroup are naturally more aligned.  \nOverall, our results show that demographic bias estimation in FER can be skewed by unequal visual conditions, although the magnitude of this effect varies across datasets and confounding factors. Our standardized evaluation provides a simple, model-agnostic way to disentangle intrinsic  \nmodel bias from dataset composition, leading to more reliable fairness measurements.  \nOur main contributions are as follows:  \n- We identify visual factors, such as head pose and illumination, as critical confounders in fairness evaluation for FER."
+    },
+    {
+      "source_id": "d62c4379940793fe2c0d02273c8c1088",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition",
+      "section": "Abstract",
+      "text": "_Ensuring demographic fairness has become a critical requirement for face processing technologies, and particularly for Facial Expression Recognition (FER). While it is well-established in the literature that visual confounders like head pose strongly affect the recognition performance of FER algorithms, their impact on the estimation of fairness has been overlooked. If demographic groups are observed under unequal visual conditions, usual performance comparisons can be heavily confounded. In this work, we analyze the impact of prominent visual confounders such as head pose and illumination on the estimation of gender bias. Through a controlled study on the Multi-PIE dataset, we show that unequal distributions of just one confounding factor can significantly distort the estimation of demographic bias. To address this, we propose a simple confounder-standardized evaluation protocol and test it on three in-the-wild datasets: Aff-Wild2, RAF-DB and AffectNet+. Our results reveal that the confounding effect is dataset-dependent. For example, in Aff-Wild2, the empirical fairness gap under head pose confounding increases from 4.23% to 6.25% once standardized. Ultimately, our findings"
+    },
+    {
+      "source_id": "a61cced9f3fdd272857db9efa7353358",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition",
+      "section": "5. Controlled Study on Multi-PIE > 5.2. Empirical vs. Pose-Standardized Fairness",
+      "text": "||**GAP**|**-0.79**|**-2.69**|**-3.13**|**2.95**|  \nTable 3. Macro-averaged TPR (%) per gender for each in-the-wild dataset using the head pose and illumination as visual confounders.  \nthan in profile pose. Therefore, when the evaluation subset contains a higher proportion of frontal male samples and profile female samples, the empirical fairness gap grows. However, the standardized fairness gap in the biased subset is 4.29%, which remains much closer to the empirical fairness gap observed under the balanced condition.  \nSince both evaluation conditions are drawn from the same balanced test pool and use the same model, these differences can only be attributed to the head pose composition of the evaluation subset. Overall, this controlled experiment shows that head pose acts as a visual confounder in fairness evaluation. More importantly, it shows that when the evaluation data cannot be fully balanced, the proposed standardized metric can recover a fairness estimate that remains close to the one obtained under balanced conditions, and therefore better reflects the underlying subgroup disparity."
+    },
+    {
+      "source_id": "1e18db107f6f5603e0cb52ca6989999f",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition",
+      "section": "4. Experimental Setup",
+      "text": "We evaluate the proposed factor-standardized fairness protocol in both controlled and in-the-wild settings. For the controlled study, we use Multi-PIE [7], which provides a suitable benchmark to analyze the effect of head pose under structured acquisition conditions. This controlled environment allows us to isolate the impact of head pose by artificially varying its distribution across demographic groups in the test set. By doing so, we can demonstrate how the measured fairness gap changes due to dataset composition.  \nFor the in-the-wild analysis, we use Aff-Wild2 [13–16], AffectNet+ [6], and RAF-DB [17]. These datasets exhibit different degrees of variability in head pose and illumination, making them suitable for studying whether visual confounders can influence fairness evaluation in realistic conditions.  \nExpression label spaces vary across datasets. Multi-PIE includes six categories (neutral, smile, surprise, squint, disgust, scream), RAF-DB defines seven (neutral, happy, surprise, fear, disgust, anger, sad), AffectNet+ comprises eight"
+    },
+    {
+      "source_id": "4de35d54a691e32ed99be915580887eb",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition",
+      "section": "2. Related Work > 2.3. Data Composition and Subgroup Bias",
+      "text": "When demographic subgroups are unevenly distributed across challenging ‘in-the-wild’ conditions ( _e.g_ ., extreme yaw or low illumination), the resulting performance gap is not a pure measure of demographic bias, but a reflection of subgroup imbalance in visual factors. In face analysis, previous work [1, 28] has highlighted that balancing a dataset only at the demographic level may not be sufficient if other important variables remain unbalanced. This perspective is especially relevant for fairness evaluation, since an empirical demographic gap may reflect both intrinsic model behavior and differences in the visual conditions under which each subgroup is evaluated.  \nWhile previous studies focus on identifying performance gaps [19, 29] or proposing algorithmic mitigation [3, 22], our work focuses on the evaluation process itself. Specifically, we address a critical flaw in demographic bias estimation: the compositional confounding that occurs when visual factors and demographic labels are correlated. By introducing a standardized protocol, we isolate these effects,"
+    },
+    {
+      "source_id": "97ad90a58205f604f44ad8c864d23622",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition",
+      "section": "3. Standardized Fairness Evaluation",
+      "text": "This quantity corresponds to the recall of class _c_ within subgroup _g_ and visual condition _b_ . It captures how recognition performance varies across visual conditions for each subgroup.  \nThe usual evaluation protocol ignores the visual confounding variables, defining  \nOur key insight is that a demographic subgroup _g_ may be exposed to different distributions of visual confounders _b_ and hence the _empirical macro-averaged_ TPR  \nand the _empirical fairness gap_ for the gender demographic attribute, treated as a binary category _G_ = _{m, f }_ ,  \nmay be confounded.  \n5259  \nTo isolate model bias from these compositional effects, we introduce a standardized evaluation in which every subgroup is assessed under a balanced distribution of confounder bins. To summarize performance across expression classes, we compute the subgroup macro-averaged TPR as  \nthe _standardized macro-averaged_ TPR as  \nand the _standardized fairness gap_ as  \nwhere positive values indicate better male performance and negative values better female performance."
+    },
+    {
+      "source_id": "ab7533ef5317543f07c28b0f84080e77",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition",
+      "section": "6. In-the-Wild Analysis > 6.1. Aff-Wild2",
+      "text": "Aff-Wild2 provides a particularly informative in-the-wild case study, as head pose remains a relevant source of variability across the dataset. As shown in Fig. 2, head pose differs noticeably across gender: female samples are more concentrated in frontal positions, whereas male samples appear more frequently in profile views. In contrast, illumination remains more consistent across genders.  \nHead pose also shows a clearer confounding pattern in  \n|**Database**|**Visual factor**|**GAP**|**GAP**<sup>_std_</sup>|∆|\n|---|---|---|---|---|\n|Aff-Wild2|Head pose<br>Illumination|4.23|6.25<br>3.71|-2.02<br>0.52|\n|AffectNet+|Head pose<br>Illumination|2.82|3.10<br>2.46|-0.28<br>0.36|\n|RAF-DB|Head pose<br>Illumination|-0.82|-1.74<br>-0.09|0.92<br>-0.73|  \nTable 4. Dataset-level comparison of empirical and standardized fairness gaps (%) for gender under head pose and illumination confounding factors.  \n<!-- Start of picture text -->\n1.0<br>Pose bin<br>0–15°<br>0.8 +15°<br>0.6<br>0.4<br>0.2<br>0.0<br>Females Males<br>Gender<br>1.0<br>Illumination bin<br>0–125<br>0.8 125–255<br>0.6<br>0.4<br>0.2<br>0.0<br>Females Males<br>Gender<br>Proportion<br>Proportion<br><!-- End of picture text -->"
+    },
+    {
+      "source_id": "dd3a2214269c487295c669a2bde87d8f",
+      "paper": "Deconfounding demographic bias estimation in facial expression recognition",
+      "section": "7. Conclusion",
+      "text": "A primary limitation of our proposal is its heavy reliance on annotated confounding factors and sufficient sample density. Because our method requires evaluating performance within specific visual bins, increasing the number of confounders simultaneously ( _e.g_ ., pose, illumination, and resolution) exponentially increases the amount of data required to maintain stable estimates. In small or highly imbalanced datasets, this can lead to insufficient support for certain demographic-by-confounder combinations. Nevertheless, this extensive data requirement is an unavoidable necessity for rigorous fairness evaluation; without it, any measured bias remains inherently entangled with dataset composition. This highlights a critical need for the community to collect and annotate large-scale datasets with both demographic and environmental diversity in mind."
+    },
+    {
+      "source_id": "01b520b0ef421db95fbc22feb9e6f9a1",
+      "paper": "Learning to Detect and Describe a Wireframe",
+      "section": "4 Experiments > 4.2 Quantitative Results",
+      "text": "To evaluate efficiency, the inference time and parameter count were measured for each model separately (HAWP and DISK), their combined total, and the multitask model. The measurements were conducted using a NVIDIA GeForce GTX 1070 GPU with images of size 640x640. The inference time was averaged over 1,000 images for consistency.  \nThe results in Tables 1–3 highlight the efficiency and competitive performance of the multitask model. As shown in Table 1, the model achieves higher repeatability at 1px, while at 3px, there is a slight decrease. The percentage of  \nLearning to Detect and Describe a Wireframe 11  \n|||**HPat**|**ches**|||**Wirefr**|**ame**||\n|---|---|---|---|---|---|---|---|---|\n|**Models**|**# Lines**|**f1@1px**|**f1@3px**|**msAP**|**# Lines**|**f1@1px**|**f1@3px**|**msAP**|\n|**LSD**|424|0.139|0.253|0.272|332|0.219|0.454|0.290|\n|**HAWP**|773|0.133|0.226|0.329|841|0.175|0.476|0.221|\n|**Ours**|670|0.140|0.220|0.306|755|0.169|0.414|0.243|  \nTable 2: Comparison of line metrics on the HPatches and Wireframe datasets.  \n|**Models**<br>**Inference **|**Time (ms)**|**# Parameters**|\n|---|---|---|\n|**Sum of Teacher Models**<br>1|67|12.822.865|\n|**Ours**<br>1|17|5.634.960|"
+    },
+    {
+      "source_id": "960c7c67ac46ee894f3843088c19a035",
+      "paper": "Learning to Detect and Describe a Wireframe",
+      "section": "5 Conclusion",
+      "text": "We presented the first unified neural network architecture that jointly detects and describes image wireframes by seamlessly integrating keypoint and line segment extraction into a single, efficient framework. This integration offers both advantages and challenges in combining multiple tasks into a single model.  \nBy leveraging a novel multitask distillation strategy, we transfer knowledge from state-of-the-art teacher models into a compact and shared encoder-decoder network. Our approach not only maintains competitive accuracy in terms of keypoint repeatability and matching quality, but also substantially reduces inference time and parameter count. The model’s ability to perform both tasks in parallel makes it well-suited for real-time applications, such as SLAM and  \n12 I. Ferre et al.  \n<!-- Start of picture text -->\n(a) Keypoints (b) Keypoints (c) Lines (d) Lines<br>(DISK) (Ours) (HAWP) (Ours)<br><!-- End of picture text -->  \nFig. 4: **Comparative visualizations:** The left two columns show keypoints detected using DISK (left) and the trained model (right), while the right two columns show lines detected using HAWP (left) and the trained model (right)."
+    },
+    {
+      "source_id": "402957358b3ff6e499a0eb5f11552499",
+      "paper": "Learning to Detect and Describe a Wireframe",
+      "section": "1 Introduction",
+      "text": "We train the model using a multitask distillation framework that integrates knowledge from two independent teacher networks, one for lines and one for keypoints. Instead of relying solely on final outputs, the student learns from intermediate feature representations, enabling more efficient knowledge transfer. The training minimizes the discrepancy between the student and teacher feature maps via a weighted _L_ 2 loss, balancing contributions from each task and promoting both robustness and computational efficiency.  \nWe evaluate our method by comparing its performance to the teacher models and state-of-the-art methods on the HPatches and Wireframe datasets. We assess the repeatability of our detections and the quality of our matches. The proposed model is also analyzed in terms of inference speed and parameter efficiency, highlighting improvements over the individual teacher networks and demonstrating the benefits of the multitask distillation approach.  \nIn summary, our main contributions are:  \n- We propose the first model that jointly detects and describes image wireframes."
+    },
+    {
+      "source_id": "9527d1f960ba191dd3a946cc6eeff4d5",
+      "paper": "Learning to Detect and Describe a Wireframe",
+      "section": "3 Method",
+      "text": "Learning to Detect and Describe a Wireframe 5  \nFig. 2: **Proposed architecture for joint line and point detection and description.** The model follows an encoder-decoder structure with a shared encoder pre-trained from DISK and two decoder branches: one for line segments using Holistic Attraction Field Maps (HAFM), junctions, and verification features, and another for keypoints and their descriptors. Each branch has a dedicated prediction head, and training uses the distillation loss _L_ to align the student’s feature maps with those of the teacher models (HAWP for lines and DISK for keypoints)."
+    },
+    {
+      "source_id": "e7e7a6a8b3f375021b8151efbd7124cd",
+      "paper": "Learning to Detect and Describe a Wireframe",
+      "section": "3 Method > 3.4 The Multitask Distillation Framework",
+      "text": "We introduce a unified multitask distillation framework for simultaneous keypoint and line segment detection and description. Our method distills from two teachers, HAWP [24] for line detection, and DISK [21] for keypoint detection, both open-source models with permissive license. We train a compact student model, reducing redundancy, and ensuring consistent feature representations. This makes it ideal for real-time, high-accuracy applications such as robotics, augmented reality, and 3D reconstruction.  \nThe approach uses a shared encoder-decoder architecture. We initialize the encoder with DISK’s pre-trained weights. Next, each decoder specializes in one task. Task-specific heads refine these outputs into the final predictions, achieving performance on par with the teacher models while significantly reducing computational complexity. HAWP provides expertise in detecting line segments and their connections as graphs, while DISK excels at identifying keypoints and generating robust descriptors. Through knowledge distillation, the student model inherits the strengths of both teachers, ensuring a seamless and unified detection process."
+    },
+    {
+      "source_id": "31b01c18981cabaf297c4fa278b8bf74",
+      "paper": "Learning to Detect and Describe a Wireframe",
+      "section": "2 Related work",
+      "text": "Classical corner [6,18,16,17], blob [12,2], and line detectors [4,22,19] directly use image intensities or their gradients to detect distinctive features. Modern approaches leverage deep learning to improve robustness and semantic awareness.  \nSuperPoint [3] uses a single encoder to detect corners and generate descriptors, training on synthetic data and refining on real images via homographic adaptation. DISK [21] trains a U-Net end-to-end with reinforcement learning,  \n4 I. Ferre et al.  \nrewarding keypoints that improve matching. ALIKED [27] pairs an encoder with a lightweight decoder and uses deformable convolutions along with sub-pixel keypoint supervision (via a Neural Reprojection Error) to compensate for reduced depth. Deformable convolutions run fast with a custom CUDA implementation but are hard to port.  \nIn the domain of line segments, local methods such as LSD [22] or ELSED [19] offer fast and accurate alternatives to the classical Hough Transform [4]. However, they ignore scene semantics, suffer from viewpoint inconsistencies, and are sensitive to lighting variations."
+    },
+    {
+      "source_id": "37454e8aa33ee4aab89157447c55bf16",
+      "paper": "Learning to Detect and Describe a Wireframe",
+      "section": "3 Method > 3.3 Keypoint Detection and Description Decoder",
+      "text": "8 I. Ferre et al.  \n(a) HAWP  \n(b) Ours  \n(c) HAWP (d) Ours  \nFig. 3: **Comparison of the Holistic Attraction Field Map (HAFM) and junctions heatmap between HAWP (teacher) and our model (student).** The left two columns (a, b) show a PCA visualization of the HAFM, where we observe that the feature map produced by the student closely resemble these of the teacher, indicating effective knowledge transfer. The right two columns (c, d) display the junction heatmaps from both models, demonstrating that the student successfully replicates the junction localization patterns learned from the teacher."
+    },
+    {
+      "source_id": "ddc2e632636cd6f4ef439a092098f138",
+      "paper": "Learning to Detect and Describe a Wireframe",
+      "section": "4 Experiments > 4.1 Training Details",
+      "text": "The multitask model is implemented using PyTorch Lightning and trained for 35 epochs until convergence, using a combined dataset of COCO [10] and Wireframe (train split) [8], containing approximately 13,000 examples per epoch. We used Adam optimizer with an initial learning rate of 1 _×_ 10<sup>_−_4</sup> , which was reduced whenever the validation loss plateaued. The model took around 12 hours to train on an NVIDIA A100 GPU."
+    }
+  ],
+  "known_gaps": [
+    {
+      "source_id": "gap_001",
+      "topic": "GPU memory used to train the models of either paper",
+      "reason": "Neither paper reports memory usage. The wireframe paper names its GPUs (an A100 for training, a GTX 1070 for inference) but not how much memory was used."
+    },
+    {
+      "source_id": "gap_002",
+      "topic": "Fairness results by age or ethnicity in 'Deconfounding demographic bias estimation in facial expression recognition'",
+      "reason": "The paper only analyzes gender and leaves age and ethnicity as future work."
+    },
+    {
+      "source_id": "gap_003",
+      "topic": "Use of the COCO dataset in 'Deconfounding demographic bias estimation in facial expression recognition'",
+      "reason": "COCO is only used by the wireframe paper."
+    },
+    {
+      "source_id": "gap_004",
+      "topic": "Results of the wireframe model inside a SLAM or 3D reconstruction pipeline",
+      "reason": "SLAM and 3D reconstruction are only mentioned as motivating applications; there are no experiments on them."
+    },
+    {
+      "source_id": "gap_005",
+      "topic": "FLOPs of the model proposed in 'Learning to Detect and Describe a Wireframe'",
+      "reason": "The paper reports inference time and parameter count, but not FLOPs."
+    },
+    {
+      "source_id": "gap_006",
+      "topic": "Use of large language models to reduce gender bias",
+      "reason": "Neither paper uses or discusses language models."
+    }
+  ]
+}

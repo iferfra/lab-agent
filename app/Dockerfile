@@ -6,8 +6,6 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 
-COPY ./data ./data
-
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY ./app ./app
@@ -16,4 +14,4 @@ COPY ./src ./src
 
 EXPOSE 8000
 
-CMD ["uv", "run", "fastapi", "run", "app/main.py", "--host", "localhost", "--port", "8000"]
+CMD ["uv", "run", "--no-sync", "fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]
