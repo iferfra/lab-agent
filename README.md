@@ -259,11 +259,30 @@ refuses to score a run that was made with different questions.
 ### Prerequisites
 
 - **Docker** with Docker Compose.
+- **A Neo4j Aura instance.** The free tier is enough (see below).
 - **Amazon Bedrock** in `us-east-1` with access to Amazon Nova Lite, Amazon
   Nova 2 Lite, Titan Text Embeddings v2 and Claude Sonnet 4.6, plus a Bedrock
   API key (bearer token). Cohere Rerank 3.5 is optional (see `RERANK_MODEL`).
 
-Neo4j (5, with APOC) runs as one of the containers, so nothing else is needed.
+### Create the Neo4j Aura database
+
+The knowledge graph and the vector index live in
+[Neo4j Aura](https://neo4j.com/product/auradb/), Neo4j's managed cloud database.
+The free tier holds far more than this project needs.
+
+1. Sign up at [console.neo4j.io](https://console.neo4j.io).
+2. Create a new instance and choose **AuraDB Free**.
+3. When the instance is created, **download the credentials file**. It holds
+   the password, and Aura shows it only once.
+4. Wait until the instance status is *Running* (a minute or two).
+
+The file contains `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` and, on
+recent instances, `NEO4J_DATABASE`: these are the values `.env` needs. On
+startup the API creates the constraints and the vector index it uses. Free
+instances are paused after some days without use; resume them from the console.
+
+To look at the graph, open the instance in the Aura console and use **Query**,
+for example with `MATCH (p:Paper)-[r]->(e) RETURN p, r, e`.
 
 ### Configuration
 
@@ -271,13 +290,12 @@ Neo4j (5, with APOC) runs as one of the containers, so nothing else is needed.
 cp .env.example .env
 ```
 
-Only two values must be filled in: `NEO4J_PASSWORD` (any password of at least 8
-characters; the Neo4j container is created with it) and
+Fill in the four `NEO4J_*` values from the Aura credentials file and
 `AWS_BEARER_TOKEN_BEDROCK`. The rest have working defaults.
 
 | Variable | Meaning |
 |---|---|
-| `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE` | Neo4j connection. Inside Docker the API always uses the bundled container; the URI is for running the API or the evaluation from your machine. To use an external instance such as Neo4j Aura, remove the Neo4j overrides from `docker-compose.yml`. |
+| `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE` | Neo4j Aura connection, from the credentials file |
 | `AWS_BEARER_TOKEN_BEDROCK` | Bedrock API key; it expires, so renew it when calls fail with `Bearer Token has expired` |
 | `AGENT_LLM` | Model the agent reasons with |
 | `PAPER_LLM` | Model that reads each whole paper at ingestion (one call per paper) |
@@ -297,12 +315,9 @@ docker compose up --build
 |---|---|
 | Frontend | http://localhost:10000 |
 | API docs | http://localhost:8000/docs |
-| Neo4j Browser, to explore the graph (user `neo4j`) | http://localhost:7474 |
 
-The API waits until Neo4j is healthy, then creates the constraints and the
-vector index. Uploaded papers and the graph are kept in Docker volumes, so they
-survive `docker compose down` (use `docker compose down -v` to start from
-scratch).
+Uploaded PDFs are kept in the `lab_data` Docker volume and the graph in Aura,
+so both survive `docker compose down`.
 
 Then upload a PDF on the **Upload** page, wait until its status is
 *completed* (about a minute for a 15-page paper), and ask about it in **Chat**.
@@ -321,7 +336,6 @@ Requires [uv](https://docs.astral.sh/uv/) and Node.js 22.
 
 ```bash
 uv sync                                  # Python dependencies
-docker compose up -d neo4j               # only the database
 uv run fastapi dev app/main.py           # API with auto-reload on :8000
 
 cd frontend && npm install && npm run dev   # frontend on :5173, proxies /api to :8000
