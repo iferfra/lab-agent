@@ -152,7 +152,7 @@ The model chooses among three tools (`src/agent/tools.py`):
 |---|---|---|
 | `search_knowledge_graph` | An LLM writes a Cypher query from the question (LangChain `GraphCypherQAChain`) and returns the raw rows | Authorship and relationships across papers |
 | `find_paper_entities` | A fixed Cypher query that lists a paper's methods, datasets, metrics… with their relationship (`PROPOSES`, `USES_DATASET`…) and how many chunks mention them | "Which datasets does X use?", "Which paper uses HPatches?" |
-| `search_chunks_semantically` | Vector search over the chunks, optionally restricted to one paper (`paper_title`); returns the 10 best chunks with their section | Details, results and claims from the text |
+| `search_chunks_semantically` | Vector search shortlists 50 chunks (optionally from one paper, `paper_title`), and a reranker (Cohere Rerank 3.5) keeps the 10 most relevant, with their section | Details, results and claims from the text |
 
 The agent can make at most 5 model calls. If it still wants a tool after that,
 `final_answer` makes it answer with the evidence gathered so far, instead of
@@ -261,7 +261,7 @@ refuses to score a run that was made with different questions.
 - **Docker** with Docker Compose.
 - **Amazon Bedrock** in `us-east-1` with access to Amazon Nova Lite, Amazon
   Nova 2 Lite, Titan Text Embeddings v2 and Claude Sonnet 4.6, plus a Bedrock
-  API key (bearer token).
+  API key (bearer token). Cohere Rerank 3.5 is optional (see `RERANK_MODEL`).
 
 Neo4j (5, with APOC) runs as one of the containers, so nothing else is needed.
 
@@ -283,6 +283,7 @@ characters; the Neo4j container is created with it) and
 | `PAPER_LLM` | Model that reads each whole paper at ingestion (one call per paper) |
 | `GRAPH_LLM` | Model that finds the entities of each chunk (one call per chunk) |
 | `EVALUATION_LLM` | Model that generates benchmark questions and judges answers |
+| `RERANK_MODEL` | Reranker for text search (`cohere.rerank-v3-5:0`). Leave it empty to rank chunks by vector similarity only |
 | `CHUNK_SIZE`, `CHUNK_OVERLAP` | Chunking in characters (changing them changes chunk ids, see above) |
 | `DATA_DIR` | Where uploaded PDFs and their Markdown are stored |
 
@@ -342,22 +343,24 @@ The `eval` and `src` modules are run as packages from the repository root
 
 ## Results
 
-The same 17 questions, answered by the agent with three different sets of
-tools (`eval/results.md`):
+The same 17 questions, answered by the agent with different retrieval setups
+(`eval/results.md`):
 
-| Variant | Tools | Fact recall | Faithfulness | Abstention | Context recall | Latency (median) | Tokens / question |
+| Run | Tools | Fact recall | Faithfulness | Abstention | Context recall | Latency (median) | Tokens / question |
 |---|---|---|---|---|---|---|---|
-| **hybrid** | graph + text | **96%** | **100%** | 100% | **56%** | 4.6 s | 8,976 |
-| vector | text only | 82% | 99% | 100% | 50% | 3.3 s | 7,673 |
-| graph | graph only | 83% | 87% | 100% | — | 9.9 s | 12,495 |
+| **hybrid + reranker** | graph + text | **100%** | **100%** | 100% | **75%** | 5.0 s | 8,987 |
+| hybrid | graph + text | 98% | 100% | 100% | 56% | 4.6 s | 8,976 |
+| vector | text only | 91% | 99% | 100% | 50% | 3.3 s | 7,673 |
+| graph | graph only | 75% | 87% | 100% | — | 9.9 s | 12,495 |
 
 Fact recall by question category:
 
-| Variant | graph (5) | semantic (6) | hybrid (2) |
+| Run | graph (5) | semantic (6) | hybrid (2) |
 |---|---|---|---|
-| hybrid | 95% | 100% | 90% |
-| vector | 73% | 100% | 50% |
-| graph | 95% | 67% | 100% |
+| hybrid + reranker | 100% | 100% | 100% |
+| hybrid | 95% | 100% | 100% |
+| vector | 76% | 100% | 100% |
+| graph | 95% | 67% | 50% |
 
 What the comparison shows:
 
@@ -371,18 +374,23 @@ What the comparison shows:
   with claims it cannot support.
 - **The graph alone is the most expensive variant**, not the cheapest. With no
   text to fall back on, the agent retries Cypher queries: 9.9 s and about 12k
-  tokens per question. The hybrid agent costs only about 17% more tokens than
+  tokens per question. The hybrid agent costs about 17% more tokens than
   text-only search.
-- **Retrieval is the weak spot.** Context recall is 56%: the right chunk is
-  often missing among the ten the vector search returns.
+- **The reranker fixes most retrieval misses.** Vector search shortlists 50
+  chunks and Cohere Rerank 3.5 keeps the 10 best. Context recall rises from 56%
+  to 75% (83% on semantic questions), at the same token cost, 0.4 s more and
+  about $0.003 per question.
 - **Source accuracy is not comparable across variants.** A single-tool variant
   cannot use the sources it does not have, so it is left out of the table. For
-  the hybrid agent it is 71%; most misses are semantic questions where it also
-  queried the graph.
-- **The benchmark is small.** With 17 questions one question is 6 points, and
-  the hybrid category has only two. The direction of the results is clear, but
-  not the exact size of the gaps.
+  the hybrid agent it is 65–71%; most misses are semantic questions where it
+  also queried the graph.
+- **The benchmark is small, and the judge is noisy.** With 17 questions one
+  question is 6 points, and the hybrid category has only two. Re-judging the
+  same answer has changed its score, so read differences of one or two
+  questions as noise. The direction of the results is clear, but not the exact
+  size of the gaps.
 
+## Costs
 ## Costs
 ## Costs
 
@@ -393,7 +401,7 @@ prices change, so check them before running large jobs):
 |---|---|
 | Ingest one paper (~40 chunks) | $0.10–0.15, most of it the Claude Sonnet call |
 | Generate a full question set | ~$0.03 |
-| Agent run over the benchmark | a few cents |
+| Agent run over the benchmark | a few cents (reranking adds about $0.05) |
 | Judge a run | ~$0.01–0.02 |
 | `evaluate --no-judge`, tests, `sources`, `report` | free |
 

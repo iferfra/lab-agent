@@ -4,7 +4,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.tools import tool
 from langchain_neo4j import GraphCypherQAChain
 
-from src.agent.llm import agent_llm, embedder
+from src.agent.llm import RERANK_MODEL, agent_llm, embedder, rerank
 
 graph = None
 
@@ -86,6 +86,11 @@ def search_knowledge_graph(query: str) -> str:
 
 CHUNKS_PER_SEARCH = 10
 
+# With a reranker, vector search only shortlists candidates: the reranker reads
+# the query and each chunk together, which ranks far better than comparing
+# embeddings, and keeps the best CHUNKS_PER_SEARCH.
+CANDIDATES_TO_RERANK = 50
+
 # The vector index cannot filter by paper, so when a paper is given we fetch
 # more candidates and keep the best ones that belong to it (via PART_OF).
 CANDIDATES_WHEN_FILTERING = 100
@@ -124,17 +129,20 @@ def search_chunks_semantically(query: str, paper_title: str | None = None) -> st
         return "Error: Database client is not initialized."
 
     try:
+        shortlist = CANDIDATES_TO_RERANK if RERANK_MODEL else CHUNKS_PER_SEARCH
         results = graph.query(
             VECTOR_SEARCH_QUERY,
             params={
                 "embedding": embedder.embed_query(query),
                 "paper_title": paper_title,
-                "candidates": CANDIDATES_WHEN_FILTERING
-                if paper_title
-                else CHUNKS_PER_SEARCH,
-                "limit": CHUNKS_PER_SEARCH,
+                "candidates": CANDIDATES_WHEN_FILTERING if paper_title else shortlist,
+                "limit": shortlist,
             },
         )
+
+        if RERANK_MODEL and results:
+            ranking = rerank(query, [r["text"] for r in results], CHUNKS_PER_SEARCH)
+            results = [{**results[i], "score": score} for i, score in ranking]
 
         if not results:
             if paper_title:
