@@ -32,8 +32,27 @@ answers and whether the graph actually helps compared with plain vector search.
                    LLMs and embeddings: Amazon Bedrock
 ```
 
+## Screenshots
+
+Answers combine the graph (which papers an author wrote) with the papers' text
+(their contributions):
+
+![Chat answering a question about an author's papers](docs/images/chat_page.png)
+
+| Indexed papers | Upload with optional metadata |
+|---|---|
+| ![Documents page](docs/images/documents_page.png) | ![Upload page](docs/images/upload_page.png) |
+
+A paper and its entities in Neo4j: the method it proposes, the methods it
+builds on, its datasets, metrics and the concepts it studies.
+
+<p align="center">
+  <img src="docs/images/neo4j_graph.png" alt="A paper and its entities in the Neo4j graph" width="520">
+</p>
+
 ## Contents
 
+- [Screenshots](#screenshots)
 - [Repository layout](#repository-layout)
 - [How it works](#how-it-works)
   - [Ingestion](#ingestion)

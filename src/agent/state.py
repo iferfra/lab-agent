@@ -8,5 +8,3 @@ from typing_extensions import TypedDict
 class AgentState(TypedDict, total=False):
     messages: Annotated[list[BaseMessage], add_messages]
     model_calls: int
-    tools: list[str]
-    question_type: str

@@ -90,7 +90,6 @@ def make_call_model(tools: list[BaseTool]):
 
         return {
             "messages": [response],
-            "tools": [call["name"] for call in response.tool_calls],
             "model_calls": model_calls,
         }
 

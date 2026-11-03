@@ -131,11 +131,8 @@ export default function UploadPage() {
       setFileError(`The file is larger than ${MAX_MB} MB.`);
       return;
     }
+    // The title is left empty on purpose: the API extracts it from the paper
     setFile(f);
-    if (!form.paper_title) {
-      const guess = f.name.replace(/\.pdf$/i, "").replace(/[_]+/g, " ").trim();
-      setForm((p) => ({ ...p, paper_title: guess }));
-    }
   }
 
   function onDrop(e: DragEvent) {
